@@ -60,6 +60,28 @@ func TestCalculateCostUnified_TokenMode(t *testing.T) {
 	require.Equal(t, string(BillingModeToken), cost.BillingMode)
 }
 
+func TestCalculateCostUnified_TokenModeAppliesRateMultiplierToImageTokens(t *testing.T) {
+	bs := newTestBillingService()
+	resolver := NewModelPricingResolver(nil, bs)
+
+	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 600, ImageOutputTokens: 100}
+	cost, err := bs.CalculateCostUnified(CostInput{
+		Ctx:            context.Background(),
+		Model:          "claude-sonnet-4",
+		Tokens:         tokens,
+		RateMultiplier: 3.0,
+		Resolver:       resolver,
+	})
+	require.NoError(t, err)
+
+	textInput := 1000 * 3e-6
+	textOutput := 500 * 15e-6
+	imageOutput := 100 * 15e-6
+	require.InDelta(t, textInput+textOutput+imageOutput, cost.TotalCost, 1e-10)
+	require.InDelta(t, (textInput+textOutput+imageOutput)*3.0, cost.ActualCost, 1e-10)
+	require.InDelta(t, imageOutput, cost.ImageOutputCost, 1e-10)
+}
+
 func TestCalculateCostUnified_PerRequestMode(t *testing.T) {
 	// Set up a ChannelService with a per-request pricing channel
 	cs := newTestChannelServiceWithCache(t, &channelCache{
@@ -147,40 +169,35 @@ func TestCalculateCostUnified_ImageMode(t *testing.T) {
 	require.Equal(t, string(BillingModeImage), cost.BillingMode)
 }
 
-func TestCalculateCostUnified_RateMultiplierZeroDefaultsToOne(t *testing.T) {
+// TestCalculateCostUnified_RateMultiplierZeroProducesZero 锁定新行为：
+// 保存时强制 > 0；若 0 仍泄漏到计费层，按 0 计费（而非历史上的 1.0）。
+func TestCalculateCostUnified_RateMultiplierZeroProducesZero(t *testing.T) {
 	bs := newTestBillingService()
 	resolver := NewModelPricingResolver(nil, bs)
 
 	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 500}
 
-	costZero, err := bs.CalculateCostUnified(CostInput{
+	cost, err := bs.CalculateCostUnified(CostInput{
 		Ctx:            context.Background(),
 		Model:          "claude-sonnet-4",
 		Tokens:         tokens,
-		RateMultiplier: 0, // should default to 1.0
+		RateMultiplier: 0,
 		Resolver:       resolver,
 	})
 	require.NoError(t, err)
-
-	costOne, err := bs.CalculateCostUnified(CostInput{
-		Ctx:            context.Background(),
-		Model:          "claude-sonnet-4",
-		Tokens:         tokens,
-		RateMultiplier: 1.0,
-		Resolver:       resolver,
-	})
-	require.NoError(t, err)
-
-	require.InDelta(t, costOne.ActualCost, costZero.ActualCost, 1e-10)
+	require.Greater(t, cost.TotalCost, 0.0)
+	require.InDelta(t, 0.0, cost.ActualCost, 1e-10)
 }
 
-func TestCalculateCostUnified_NegativeRateMultiplierDefaultsToOne(t *testing.T) {
+// TestCalculateCostUnified_NegativeRateMultiplierClampedToZero 锁定新行为：
+// 负数倍率按 0 计费，避免历史的 <=0 → 1.0 把配置异常静默按标准价扣费。
+func TestCalculateCostUnified_NegativeRateMultiplierClampedToZero(t *testing.T) {
 	bs := newTestBillingService()
 	resolver := NewModelPricingResolver(nil, bs)
 
 	tokens := UsageTokens{InputTokens: 1000}
 
-	costNeg, err := bs.CalculateCostUnified(CostInput{
+	cost, err := bs.CalculateCostUnified(CostInput{
 		Ctx:            context.Background(),
 		Model:          "claude-sonnet-4",
 		Tokens:         tokens,
@@ -188,17 +205,8 @@ func TestCalculateCostUnified_NegativeRateMultiplierDefaultsToOne(t *testing.T) 
 		Resolver:       resolver,
 	})
 	require.NoError(t, err)
-
-	costOne, err := bs.CalculateCostUnified(CostInput{
-		Ctx:            context.Background(),
-		Model:          "claude-sonnet-4",
-		Tokens:         tokens,
-		RateMultiplier: 1.0,
-		Resolver:       resolver,
-	})
-	require.NoError(t, err)
-
-	require.InDelta(t, costOne.ActualCost, costNeg.ActualCost, 1e-10)
+	require.Greater(t, cost.TotalCost, 0.0)
+	require.InDelta(t, 0.0, cost.ActualCost, 1e-10)
 }
 
 func TestCalculateCostUnified_BillingModeFieldFilled(t *testing.T) {

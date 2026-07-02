@@ -112,15 +112,21 @@
                 </p>
                 <p class="text-xs">
                   <span
-                    class="text-amber-600 dark:text-amber-400"
+                    class="text-green-600 dark:text-green-400"
                     :title="t('admin.dashboard.actual')"
                     >${{ formatCost(stats.today_actual_cost) }}</span
                   >
+                  <span class="text-gray-400 dark:text-gray-500"> / </span>
+                  <span
+                    class="text-orange-500 dark:text-orange-400"
+                    :title="t('admin.dashboard.accountCost')"
+                    >${{ formatCost(stats.today_account_cost) }}</span
+                  >
+                  <span class="text-gray-400 dark:text-gray-500"> / </span>
                   <span
                     class="text-gray-400 dark:text-gray-500"
                     :title="t('admin.dashboard.standard')"
-                  >
-                    / ${{ formatCost(stats.today_cost) }}</span
+                    >${{ formatCost(stats.today_cost) }}</span
                   >
                 </p>
               </div>
@@ -142,15 +148,21 @@
                 </p>
                 <p class="text-xs">
                   <span
-                    class="text-indigo-600 dark:text-indigo-400"
+                    class="text-green-600 dark:text-green-400"
                     :title="t('admin.dashboard.actual')"
                     >${{ formatCost(stats.total_actual_cost) }}</span
                   >
+                  <span class="text-gray-400 dark:text-gray-500"> / </span>
+                  <span
+                    class="text-orange-500 dark:text-orange-400"
+                    :title="t('admin.dashboard.accountCost')"
+                    >${{ formatCost(stats.total_account_cost) }}</span
+                  >
+                  <span class="text-gray-400 dark:text-gray-500"> / </span>
                   <span
                     class="text-gray-400 dark:text-gray-500"
                     :title="t('admin.dashboard.standard')"
-                  >
-                    / ${{ formatCost(stats.total_cost) }}</span
+                    >${{ formatCost(stats.total_cost) }}</span
                   >
                 </p>
               </div>
@@ -521,19 +533,25 @@ const formatTokens = (value: number | undefined): string => {
   return value.toLocaleString()
 }
 
-const formatNumber = (value: number): string => {
-  return value.toLocaleString()
+const toFiniteNumber = (value: unknown): number => {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : 0
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
+const formatNumber = (value: number | null | undefined): string => {
+  return toFiniteNumber(value).toLocaleString()
+}
+
+const formatCost = (value: number | null | undefined): string => {
+  const safeValue = toFiniteNumber(value)
+  if (safeValue >= 1000) {
+    return (safeValue / 1000).toFixed(2) + 'K'
+  } else if (safeValue >= 1) {
+    return safeValue.toFixed(2)
+  } else if (safeValue >= 0.01) {
+    return safeValue.toFixed(3)
   }
-  return value.toFixed(4)
+  return safeValue.toFixed(4)
 }
 
 const formatDuration = (ms: number): string => {
