@@ -1263,3 +1263,11 @@ func (s *SubscriptionService) ValidateSubscription(ctx context.Context, sub *Use
 	}
 	return nil
 }
+
+// AssignOrExtendSubscriptionInTransaction leaves cache invalidation to the caller after commit.
+func (s *SubscriptionService) AssignOrExtendSubscriptionInTransaction(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error) {
+	if dbent.TxFromContext(ctx) == nil {
+		return nil, false, fmt.Errorf("subscription allocation requires a transaction")
+	}
+	return s.assignOrExtendSubscription(ctx, input, true)
+}

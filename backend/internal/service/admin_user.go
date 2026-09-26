@@ -16,9 +16,31 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/lib/pq"
 )
 
 // User management implementations
+// Governance constraints also protect legacy user edit/delete entry points.
+// Only expose the known business constraints, never arbitrary database errors.
+func userGovernanceError(err error) error {
+	var pg *pq.Error
+	if errors.As(err, &pg) && pg.Code == "23514" {
+		messages := map[string]string{
+			"正常企业必须保留至少一名有效负责人":                                       "正常企业必须保留至少一名有效负责人，请先任命其他负责人",
+			"企业负责人必须关联一个企业":                                           "企业负责人必须关联一个企业",
+			"请通过企业管理任免企业负责人":                                          "请通过企业管理任免企业负责人",
+			"企业负责人不能兼任团队成员":                                           "企业负责人不能兼任团队成员",
+			"An active team must retain an active administrator":      "正常团队必须保留至少一名有效管理员，请先任命其他管理员",
+			"Team administrators must have an active team membership": "团队管理员必须关联有效团队成员关系",
+			"Platform administrators cannot be team members":          "平台管理员不能兼任团队成员",
+		}
+		if message, ok := messages[pg.Message]; ok {
+			return infraerrors.BadRequest("GOVERNANCE_CONSTRAINT", message).WithCause(err)
+		}
+	}
+	return err
+}
+
 func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
 	users, result, err := s.userRepo.ListWithFilters(ctx, params, filters)
@@ -110,6 +132,18 @@ func (s *adminServiceImpl) GetUserIncludeDeleted(ctx context.Context, id int64) 
 func normalizeUserRole(role, fallback string) (string, error) {
 	if role == "" {
 		return fallback, nil
+	}
+	if role == RoleEnterpriseAdmin || fallback == RoleEnterpriseAdmin {
+		if role != fallback {
+			return "", infraerrors.BadRequest("ENTERPRISE_APPOINTMENT_REQUIRED", "Enterprise administrator roles must be changed through enterprise management")
+		}
+		return role, nil
+	}
+	if role == RoleTeamAdmin || fallback == RoleTeamAdmin {
+		if role != fallback {
+			return "", infraerrors.BadRequest("TEAM_APPOINTMENT_REQUIRED", "Team administrator roles must be changed through team management")
+		}
+		return role, nil
 	}
 	if role != RoleAdmin && role != RoleUser {
 		return "", fmt.Errorf("invalid role: %q (must be %s or %s)", role, RoleAdmin, RoleUser)
@@ -288,7 +322,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	if err := s.userRepo.Update(ctx, user, fields); err != nil {
-		return nil, err
+		return nil, userGovernanceError(err)
 	}
 
 	// 角色变更属权限敏感操作，落审计日志（含操作者），便于事后追溯。
@@ -380,14 +414,14 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 
 		opCtx := dbent.NewTxContext(ctx, tx)
 		if err := s.deleteUserWithAPIKeys(opCtx, id, apiKeys); err != nil {
-			return err
+			return userGovernanceError(err)
 		}
 		if err := tx.Commit(); err != nil {
-			return err
+			return userGovernanceError(err)
 		}
 	} else {
 		if err := s.deleteUserWithAPIKeys(ctx, id, apiKeys); err != nil {
-			return err
+			return userGovernanceError(err)
 		}
 	}
 

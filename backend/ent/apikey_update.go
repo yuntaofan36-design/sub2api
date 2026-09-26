@@ -587,6 +587,12 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(apikey.FieldDeletedAt, field.TypeTime)
 	}
+	if _u.mutation.TeamIDCleared() {
+		_spec.ClearField(apikey.FieldTeamID, field.TypeInt64)
+	}
+	if _u.mutation.TeamMembershipIDCleared() {
+		_spec.ClearField(apikey.FieldTeamMembershipID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
 	}
@@ -1403,6 +1409,12 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(apikey.FieldDeletedAt, field.TypeTime)
+	}
+	if _u.mutation.TeamIDCleared() {
+		_spec.ClearField(apikey.FieldTeamID, field.TypeInt64)
+	}
+	if _u.mutation.TeamMembershipIDCleared() {
+		_spec.ClearField(apikey.FieldTeamMembershipID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)

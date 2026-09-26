@@ -14,6 +14,8 @@ func UserFromServiceShallow(u *service.User) *User {
 		return nil
 	}
 	return &User{
+		Team:                       u.Team,
+		Enterprise:                 u.Enterprise,
 		ID:                         u.ID,
 		Email:                      u.Email,
 		Username:                   u.Username,
@@ -87,6 +89,8 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		Key:                k.Key,
 		Name:               k.Name,
 		GroupID:            k.GroupID,
+		TeamID:             k.TeamID,
+		TeamMembershipID:   k.TeamMembershipID,
 		Status:             k.Status,
 		IPWhitelist:        k.IPWhitelist,
 		IPBlacklist:        k.IPBlacklist,

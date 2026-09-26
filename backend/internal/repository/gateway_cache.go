@@ -422,6 +422,9 @@ func (c *gatewayCache) SaveLiveCall(ctx context.Context, record *service.LiveCal
 		"inbound_endpoint": record.InboundEndpoint,
 		"attestation":      record.AttestationCiphertext,
 	}
+	if record.OrganizationMembershipID != nil {
+		values["organization_membership_id"] = *record.OrganizationMembershipID
+	}
 	key := liveCallKey(record.CallHash)
 	pipe := c.rdb.TxPipeline()
 	pipe.HSet(ctx, key, values)
@@ -442,26 +445,32 @@ func (c *gatewayCache) GetLiveCall(ctx context.Context, callHash string) (*servi
 		value, _ := strconv.ParseInt(values[field], 10, 64)
 		return value
 	}
+	var membership *int64
+	if _, ok := values["organization_membership_id"]; ok {
+		v := parseInt("organization_membership_id")
+		membership = &v
+	}
 	createdAt := time.UnixMilli(parseInt("created_at"))
 	expiresAt := time.UnixMilli(parseInt("expires_at"))
 	return &service.LiveCallRecord{
-		CallID:                values["call_id"],
-		CallHash:              callHash,
-		AccountID:             parseInt("account_id"),
-		APIKeyID:              parseInt("api_key_id"),
-		UserID:                parseInt("user_id"),
-		GroupID:               parseInt("group_id"),
-		SubscriptionID:        parseInt("subscription_id"),
-		LeaseID:               values["lease_id"],
-		Model:                 values["model"],
-		CreatedAt:             createdAt,
-		ExpiresAt:             expiresAt,
-		Controller:            values["controller"],
-		ControllerOwner:       values["controller_owner"],
-		UserAgent:             values["user_agent"],
-		IPAddress:             values["ip_address"],
-		InboundEndpoint:       values["inbound_endpoint"],
-		AttestationCiphertext: values["attestation"],
+		OrganizationMembershipID: membership,
+		CallID:                   values["call_id"],
+		CallHash:                 callHash,
+		AccountID:                parseInt("account_id"),
+		APIKeyID:                 parseInt("api_key_id"),
+		UserID:                   parseInt("user_id"),
+		GroupID:                  parseInt("group_id"),
+		SubscriptionID:           parseInt("subscription_id"),
+		LeaseID:                  values["lease_id"],
+		Model:                    values["model"],
+		CreatedAt:                createdAt,
+		ExpiresAt:                expiresAt,
+		Controller:               values["controller"],
+		ControllerOwner:          values["controller_owner"],
+		UserAgent:                values["user_agent"],
+		IPAddress:                values["ip_address"],
+		InboundEndpoint:          values["inbound_endpoint"],
+		AttestationCiphertext:    values["attestation"],
 	}, nil
 }
 

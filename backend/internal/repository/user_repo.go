@@ -190,6 +190,9 @@ func (r *userRepository) GetByID(ctx context.Context, id int64) (*service.User, 
 	if v, ok := groups[id]; ok {
 		out.AllowedGroups = v
 	}
+	if err := r.loadTeamSummary(ctx, out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -233,6 +236,9 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service
 	}
 	if v, ok := groups[m.ID]; ok {
 		out.AllowedGroups = v
+	}
+	if err := r.loadTeamSummary(ctx, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -1596,4 +1602,39 @@ func (r *userRepository) DisableTotp(ctx context.Context, userID int64) error {
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 	return nil
+}
+
+func (r *userRepository) loadTeamSummary(ctx context.Context, u *service.User) error {
+	if u.Role == service.RoleEnterpriseAdmin {
+		e := new(service.EnterpriseSummary)
+		rows, err := r.sql.QueryContext(ctx, `SELECT e.id,e.name,e.status FROM enterprises e JOIN enterprise_leaders l ON l.enterprise_id=e.id WHERE l.user_id=$1 AND l.left_at IS NULL`, u.ID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			if err = rows.Scan(&e.ID, &e.Name, &e.Status); err != nil {
+				return err
+			}
+			u.Enterprise = e
+		}
+		return rows.Err()
+	}
+
+	if u.Role == service.RoleAdmin {
+		return nil
+	}
+	rows, err := r.sql.QueryContext(ctx, `SELECT t.id,t.name,t.status,m.id,m.status,t.enterprise_id,e.status FROM team_memberships m JOIN teams t ON t.id=m.team_id LEFT JOIN enterprises e ON e.id=t.enterprise_id WHERE m.user_id=$1 AND m.left_at IS NULL`, u.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t := new(service.TeamSummary)
+		if err = rows.Scan(&t.ID, &t.Name, &t.Status, &t.MembershipID, &t.MemberStatus, &t.EnterpriseID, &t.EnterpriseStatus); err != nil {
+			return err
+		}
+		u.Team = t
+	}
+	return rows.Err()
 }

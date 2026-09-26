@@ -376,6 +376,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		imageSizeBreakdown["image_cache_read_tokens"] = result.Usage.ImageCacheReadTokens
 	}
 	usageLog := &UsageLog{
+		RequestSubmittedAt:       openAIUsageSubmissionTime(input),
+		OrganizationMembershipID: openAIUsageMembership(input),
 		UserID:                   user.ID,
 		APIKeyID:                 apiKey.ID,
 		AccountID:                account.ID,
@@ -1163,4 +1165,24 @@ func cloneImageSizeBreakdown(input map[string]int) map[string]int {
 		output[key] = value
 	}
 	return output
+}
+
+func openAIUsageSubmissionTime(input *OpenAIRecordUsageInput) *time.Time {
+	if input.Result != nil {
+		if input.Result.RequestSubmittedAt != nil {
+			return input.Result.RequestSubmittedAt
+		}
+		if input.Result.OpenAIWSMode && !input.PricingAt.IsZero() {
+			t := input.PricingAt
+			return &t
+		}
+	}
+	return usageSubmissionTime(input.APIKey, input.PricingAt)
+}
+
+func openAIUsageMembership(input *OpenAIRecordUsageInput) *int64 {
+	if input.Result != nil && (input.Result.OrganizationMembershipID != nil || input.Result.RequestSubmittedAt != nil) {
+		return input.Result.OrganizationMembershipID
+	}
+	return input.APIKey.UsageMembershipID
 }

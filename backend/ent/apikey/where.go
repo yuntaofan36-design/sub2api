@@ -75,6 +75,16 @@ func UserID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldUserID, v))
 }
 
+// TeamID applies equality check predicate on the "team_id" field. It's identical to TeamIDEQ.
+func TeamID(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTeamID, v))
+}
+
+// TeamMembershipID applies equality check predicate on the "team_membership_id" field. It's identical to TeamMembershipIDEQ.
+func TeamMembershipID(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTeamMembershipID, v))
+}
+
 // Key applies equality check predicate on the "key" field. It's identical to KeyEQ.
 func Key(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldKey, v))
@@ -308,6 +318,106 @@ func UserIDIn(vs ...int64) predicate.APIKey {
 // UserIDNotIn applies the NotIn predicate on the "user_id" field.
 func UserIDNotIn(vs ...int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotIn(FieldUserID, vs...))
+}
+
+// TeamIDEQ applies the EQ predicate on the "team_id" field.
+func TeamIDEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTeamID, v))
+}
+
+// TeamIDNEQ applies the NEQ predicate on the "team_id" field.
+func TeamIDNEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldTeamID, v))
+}
+
+// TeamIDIn applies the In predicate on the "team_id" field.
+func TeamIDIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldTeamID, vs...))
+}
+
+// TeamIDNotIn applies the NotIn predicate on the "team_id" field.
+func TeamIDNotIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldTeamID, vs...))
+}
+
+// TeamIDGT applies the GT predicate on the "team_id" field.
+func TeamIDGT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldTeamID, v))
+}
+
+// TeamIDGTE applies the GTE predicate on the "team_id" field.
+func TeamIDGTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldTeamID, v))
+}
+
+// TeamIDLT applies the LT predicate on the "team_id" field.
+func TeamIDLT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldTeamID, v))
+}
+
+// TeamIDLTE applies the LTE predicate on the "team_id" field.
+func TeamIDLTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldTeamID, v))
+}
+
+// TeamIDIsNil applies the IsNil predicate on the "team_id" field.
+func TeamIDIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldTeamID))
+}
+
+// TeamIDNotNil applies the NotNil predicate on the "team_id" field.
+func TeamIDNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldTeamID))
+}
+
+// TeamMembershipIDEQ applies the EQ predicate on the "team_membership_id" field.
+func TeamMembershipIDEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDNEQ applies the NEQ predicate on the "team_membership_id" field.
+func TeamMembershipIDNEQ(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDIn applies the In predicate on the "team_membership_id" field.
+func TeamMembershipIDIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldTeamMembershipID, vs...))
+}
+
+// TeamMembershipIDNotIn applies the NotIn predicate on the "team_membership_id" field.
+func TeamMembershipIDNotIn(vs ...int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldTeamMembershipID, vs...))
+}
+
+// TeamMembershipIDGT applies the GT predicate on the "team_membership_id" field.
+func TeamMembershipIDGT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDGTE applies the GTE predicate on the "team_membership_id" field.
+func TeamMembershipIDGTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDLT applies the LT predicate on the "team_membership_id" field.
+func TeamMembershipIDLT(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDLTE applies the LTE predicate on the "team_membership_id" field.
+func TeamMembershipIDLTE(v int64) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldTeamMembershipID, v))
+}
+
+// TeamMembershipIDIsNil applies the IsNil predicate on the "team_membership_id" field.
+func TeamMembershipIDIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldTeamMembershipID))
+}
+
+// TeamMembershipIDNotNil applies the NotNil predicate on the "team_membership_id" field.
+func TeamMembershipIDNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldTeamMembershipID))
 }
 
 // KeyEQ applies the EQ predicate on the "key" field.

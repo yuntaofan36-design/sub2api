@@ -35,7 +35,9 @@
           v-model="form.role"
           :options="roleOptions"
           :searchable="false"
+          :disabled="user?.role === 'team_admin' || user?.role === 'enterprise_admin'"
         />
+        <p v-if="user?.role === 'team_admin' || user?.role === 'enterprise_admin'" class="mt-2 text-sm text-gray-500">{{ t(user.role === 'enterprise_admin' ? 'enterprise.roleHint' : 'teams.roleHint') }}</p>
       </div>
       <div>
         <label class="input-label">{{ t('admin.users.notes') }}</label>
@@ -102,6 +104,8 @@ const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard
 
 const submitting = ref(false); const passwordCopied = ref(false)
 const roleOptions = computed(() => [
+  { value: 'enterprise_admin', label: t('admin.users.roles.enterprise_admin'), disabled: true },
+  { value: 'team_admin', label: t('admin.users.roles.team_admin'), disabled: true },
   { value: 'user', label: t('admin.users.roles.user') },
   { value: 'admin', label: t('admin.users.roles.admin') }
 ])

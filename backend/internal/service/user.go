@@ -6,7 +6,25 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type EnterpriseSummary struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type TeamSummary struct {
+	EnterpriseID     *int64  `json:"enterprise_id"`
+	EnterpriseStatus *string `json:"enterprise_status"`
+	ID               int64   `json:"id"`
+	Name             string  `json:"name"`
+	Status           string  `json:"status"`
+	MembershipID     int64   `json:"membership_id"`
+	MemberStatus     string  `json:"member_status"`
+}
+
 type User struct {
+	Enterprise     *EnterpriseSummary
+	Team           *TeamSummary
 	ID             int64
 	Email          string
 	Username       string

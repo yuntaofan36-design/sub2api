@@ -1183,6 +1183,8 @@ func (s *GatewayService) buildRecordUsageLog(
 		)
 	}
 	usageLog := &UsageLog{
+		RequestSubmittedAt:       usageSubmissionTime(apiKey, input.PricingAt),
+		OrganizationMembershipID: apiKey.UsageMembershipID,
 		UserID:                   user.ID,
 		APIKeyID:                 apiKey.ID,
 		AccountID:                account.ID,
@@ -1262,6 +1264,20 @@ func resolveBillingMode(result *ForwardResult, cost *CostBreakdown) *string {
 func optionalSubscriptionID(subscription *UserSubscription) *int64 {
 	if subscription != nil {
 		return &subscription.ID
+	}
+	return nil
+}
+
+// usageSubmissionTime keeps organizational reporting independent of billing time.
+// WebSocket turns pass their own admission time; HTTP requests use the key's
+// request-local snapshot even when billing runs later on a background worker.
+func usageSubmissionTime(key *APIKey, turnTime time.Time) *time.Time {
+	if key != nil && !key.UsageSubmittedAt.IsZero() {
+		t := key.UsageSubmittedAt
+		return &t
+	}
+	if !turnTime.IsZero() {
+		return &turnTime
 	}
 	return nil
 }

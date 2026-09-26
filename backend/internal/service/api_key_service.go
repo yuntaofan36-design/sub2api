@@ -283,32 +283,34 @@ type RateLimitCacheInvalidator interface {
 }
 
 type APIKeyService struct {
-	apiKeyRepo                APIKeyRepository
-	userRepo                  UserRepository
-	groupRepo                 GroupRepository
-	userSubRepo               UserSubscriptionRepository
-	userGroupRateRepo         UserGroupRateRepository
-	cache                     APIKeyCache
-	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
-	concurrencyService        *ConcurrencyService
-	cfg                       *config.Config
-	authCacheL1               *ristretto.Cache
-	authNegativeCacheL1       *ristretto.Cache
-	authCfg                   apiKeyAuthCacheConfig
-	authGroup                 singleflight.Group
-	authLookupSlots           chan struct{}
-	authLookupTotal           atomic.Uint64
-	authLookupRejected        atomic.Uint64
-	authLookupInFlight        atomic.Int64
-	invalidAuthAbuse          *invalidAuthAbuseLimiter
-	authInvalidationStart     sync.Once
-	authInvalidationStop      sync.Once
-	authInvalidationCancel    context.CancelFunc
-	authInvalidationWG        sync.WaitGroup
-	authInvalidationConnected atomic.Bool
-	authInvalidationFailures  atomic.Uint64
-	lastUsedTouchL1           sync.Map // keyID -> nextAllowedAt(time.Time)
-	lastUsedTouchSF           singleflight.Group
+	organizationMembershipResolver func(context.Context, int64) (*int64, error)
+	teamAccessGuard                func(context.Context, *APIKey) error
+	apiKeyRepo                     APIKeyRepository
+	userRepo                       UserRepository
+	groupRepo                      GroupRepository
+	userSubRepo                    UserSubscriptionRepository
+	userGroupRateRepo              UserGroupRateRepository
+	cache                          APIKeyCache
+	rateLimitCacheInvalid          RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
+	concurrencyService             *ConcurrencyService
+	cfg                            *config.Config
+	authCacheL1                    *ristretto.Cache
+	authNegativeCacheL1            *ristretto.Cache
+	authCfg                        apiKeyAuthCacheConfig
+	authGroup                      singleflight.Group
+	authLookupSlots                chan struct{}
+	authLookupTotal                atomic.Uint64
+	authLookupRejected             atomic.Uint64
+	authLookupInFlight             atomic.Int64
+	invalidAuthAbuse               *invalidAuthAbuseLimiter
+	authInvalidationStart          sync.Once
+	authInvalidationStop           sync.Once
+	authInvalidationCancel         context.CancelFunc
+	authInvalidationWG             sync.WaitGroup
+	authInvalidationConnected      atomic.Bool
+	authInvalidationFailures       atomic.Uint64
+	lastUsedTouchL1                sync.Map // keyID -> nextAllowedAt(time.Time)
+	lastUsedTouchSF                singleflight.Group
 }
 
 type APIKeyAuthLookupMetrics struct {
@@ -700,8 +702,35 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 	return apiKey, nil
 }
 
-// GetByKey 根据Key字符串获取API Key（用于认证）
+// SetTeamAccessGuard installs live authorization for team-owned keys before serving requests.
+func (s *APIKeyService) SetTeamAccessGuard(guard func(context.Context, *APIKey) error) {
+	s.teamAccessGuard = guard
+}
+
+// GetByKey 根据Key字符串获取API Key（用于认证）。
 func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, error) {
+	k, err := s.getByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if k.TeamID != nil {
+		if s.teamAccessGuard == nil {
+			return nil, ErrInsufficientPerms
+		}
+		if err = s.teamAccessGuard(ctx, k); err != nil {
+			return nil, err
+		}
+	}
+	requestKey := *k
+	requestKey.UsageSubmittedAt = time.Now()
+	requestKey.UsageMembershipID, err = s.CaptureUsageMembership(ctx, &requestKey)
+	if err != nil {
+		return nil, err
+	}
+	return &requestKey, nil
+}
+
+func (s *APIKeyService) getByKey(ctx context.Context, key string) (*APIKey, error) {
 	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes {
 		return nil, ErrAPIKeyNotFound
 	}
@@ -766,7 +795,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	}
 
 	// 验证所有权
-	if apiKey.UserID != userID {
+	if apiKey.UserID != userID || apiKey.TeamID != nil {
 		return nil, ErrInsufficientPerms
 	}
 
@@ -915,6 +944,13 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 // Delete 删除API Key
 func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) error {
+	owned, lookupErr := s.apiKeyRepo.GetByID(ctx, id)
+	if lookupErr != nil {
+		return lookupErr
+	}
+	if owned.TeamID != nil {
+		return ErrInsufficientPerms
+	}
 	key, ownerID, err := s.apiKeyRepo.GetKeyAndOwnerID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get api key: %w", err)
@@ -1184,4 +1220,20 @@ func (s *APIKeyService) UpdateRateLimitUsage(ctx context.Context, apiKeyID int64
 		return nil
 	}
 	return s.apiKeyRepo.IncrementRateLimitUsage(ctx, apiKeyID, cost)
+}
+
+// SetOrganizationMembershipResolver installs a live, indexed membership read.
+// Reporting never grants or revokes personal-key access based on team status.
+func (s *APIKeyService) SetOrganizationMembershipResolver(fn func(context.Context, int64) (*int64, error)) {
+	s.organizationMembershipResolver = fn
+}
+func (s *APIKeyService) CaptureUsageMembership(ctx context.Context, key *APIKey) (*int64, error) {
+	if key.TeamMembershipID != nil {
+		id := *key.TeamMembershipID
+		return &id, nil
+	}
+	if s.organizationMembershipResolver == nil {
+		return nil, nil
+	}
+	return s.organizationMembershipResolver(ctx, key.UserID)
 }

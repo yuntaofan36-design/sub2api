@@ -626,6 +626,8 @@ export default {
       failedToLoadApiKeys: '加载用户 API 密钥失败',
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
+        enterprise_admin: '企业负责人',
+        team_admin: '团队管理员',
         admin: '管理员',
         user: '用户'
       },

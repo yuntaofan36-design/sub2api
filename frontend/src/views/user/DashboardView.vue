@@ -1,40 +1,109 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
-      <template v-else-if="stats">
-        <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" />
-        <UserDashboardCharts v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity" :loading="loadingCharts" :trend="trendData" :models="modelStats" @dateRangeChange="loadCharts" @granularityChange="loadCharts" @refresh="refreshAll" />
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div class="lg:col-span-2"><UserDashboardRecentUsage :data="recentUsage" :loading="loadingUsage" /></div>
-          <div class="lg:col-span-1"><UserDashboardQuickActions /></div>
+      <div v-if="organizationKind" class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('nav.dashboard') }}</h1>
+        <div
+          class="inline-flex rounded-xl bg-gray-100 p-1 dark:bg-dark-800"
+          role="tablist"
+          :aria-label="t('orgDashboard.scope')"
+        >
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            role="tab"
+            :aria-selected="scope === tab.value"
+            :class="
+              scope === tab.value
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+                : 'text-gray-500'
+            "
+            @click="setScope(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
         </div>
-      </template>
+      </div>
+      <div v-if="!ready" class="flex justify-center py-12"><LoadingSpinner /></div>
+      <div v-else-if="identityError" class="card p-6" role="alert">
+        <p>{{ identityError }}</p>
+        <button class="btn btn-secondary mt-4" @click="refreshIdentity">
+          {{ t('common.retry') }}
+        </button>
+      </div>
+      <OrganizationDashboard
+        v-else-if="organizationKind && scope === 'organization'"
+        :key="identity"
+        :kind="organizationKind"
+        @permission-change="refreshIdentity"
+      />
+      <PersonalDashboard v-else :key="auth.user?.id" />
     </div>
   </AppLayout>
 </template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'; import { useAuthStore } from '@/stores/auth'; import { usageAPI, type UserDashboardStats as UserStatsType } from '@/api/usage'
-import AppLayout from '@/components/layout/AppLayout.vue'; import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'; import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
-import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardRecentUsage.vue'; import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
-import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
-import { getMyPlatformQuotas } from '@/api/user'
-import { formatDateLocalInput } from '@/utils/format'
-
-const authStore = useAuthStore(); const user = computed(() => authStore.user)
-const stats = ref<UserStatsType | null>(null); const loading = ref(false); const loadingUsage = ref(false); const loadingCharts = ref(false)
-const trendData = ref<TrendDataPoint[]>([]); const modelStats = ref<ModelStat[]>([]); const recentUsage = ref<UsageLog[]>([])
-const platformQuotas = ref<PlatformQuotaItem[] | null>(null)
-
-const startDate = ref(formatDateLocalInput(new Date(Date.now() - 6 * 86400000))); const endDate = ref(formatDateLocalInput(new Date())); const granularity = ref('day')
-
-const loadStats = async () => { loading.value = true; try { await authStore.refreshUser(); stats.value = await usageAPI.getDashboardStats() } catch (error) { console.error('Failed to load dashboard stats:', error) } finally { loading.value = false } }
-const loadCharts = async () => { loadingCharts.value = true; try { const res = await Promise.all([usageAPI.getDashboardTrend({ start_date: startDate.value, end_date: endDate.value, granularity: granularity.value as any }), usageAPI.getDashboardModels({ start_date: startDate.value, end_date: endDate.value })]); trendData.value = res[0].trend || []; modelStats.value = res[1].models || [] } catch (error) { console.error('Failed to load charts:', error) } finally { loadingCharts.value = false } }
-const loadRecent = async () => { loadingUsage.value = true; try { const res = await usageAPI.getByDateRange(startDate.value, endDate.value); recentUsage.value = res.items.slice(0, 5) } catch (error) { console.error('Failed to load recent usage:', error) } finally { loadingUsage.value = false } }
-const loadPlatformQuotas = async () => { try { const data = await getMyPlatformQuotas(); platformQuotas.value = data.platform_quotas ?? [] } catch (error) { console.warn('Failed to load platform quotas:', error); platformQuotas.value = [] } }
-const refreshAll = () => { loadStats(); loadCharts(); loadRecent(); loadPlatformQuotas() }
-
-onMounted(() => { refreshAll() })
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import PersonalDashboard from '@/components/user/dashboard/PersonalDashboard.vue'
+import OrganizationDashboard from '@/components/organization/OrganizationDashboard.vue'
+const auth = useAuthStore(),
+  app = useAppStore(),
+  route = useRoute(),
+  router = useRouter(),
+  { t } = useI18n()
+const ready = ref(false),
+  identityError = ref('')
+const organizationKind = computed(() => {
+  if (auth.isSimpleMode || app.backendModeEnabled) return null
+  if (auth.isEnterpriseAdmin) return 'enterprise'
+  if (auth.isTeamAdmin) return 'team'
+  return null
+})
+const identity = computed(
+  () => `${auth.user?.id}:${auth.user?.role}:${auth.user?.enterprise?.id}:${auth.user?.team?.id}`
+)
+const scope = computed(() =>
+  organizationKind.value && route.query.scope !== 'personal' ? 'organization' : 'personal'
+)
+const tabs = computed(() => [
+  { value: 'organization', label: t(`orgDashboard.${organizationKind.value || 'team'}`) },
+  { value: 'personal', label: t('orgDashboard.personal') }
+])
+function setScope(value: string) {
+  const query = { ...route.query }
+  if (value === 'personal') query.scope = 'personal'
+  else delete query.scope
+  void router.replace({ query })
+}
+async function refreshIdentity() {
+  try {
+    await Promise.all([
+      auth.refreshUser(),
+      app.publicSettingsLoaded ? Promise.resolve() : app.fetchPublicSettings()
+    ])
+    identityError.value = ''
+  } catch (e) {
+    identityError.value = (e as { message?: string })?.message || t('orgDashboard.failed')
+  } finally {
+    ready.value = true
+  }
+}
+watch(identity, () => {
+  if (!organizationKind.value && route.query.scope) {
+    const query = { ...route.query }
+    delete query.scope
+    void router.replace({ query })
+  }
+})
+onMounted(() => {
+  void refreshIdentity()
+  window.addEventListener('focus', refreshIdentity)
+})
+onUnmounted(() => window.removeEventListener('focus', refreshIdentity))
 </script>

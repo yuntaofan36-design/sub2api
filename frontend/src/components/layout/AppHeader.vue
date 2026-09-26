@@ -123,7 +123,7 @@
               <div class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ displayName }}
               </div>
-              <div class="text-xs text-gray-500 dark:text-dark-400">
+              <div :class="['text-xs', user.role === 'enterprise_admin' ? 'text-blue-700 dark:text-blue-400' : user.role === 'team_admin' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-500 dark:text-dark-400']">
                 {{ t('admin.users.roles.' + user.role) }}
               </div>
             </div>
@@ -338,6 +338,10 @@ const pageTitle = computed(() => {
 })
 
 const pageDescription = computed(() => {
+  if (route.path === '/dashboard' && route.query.scope !== 'personal' && !authStore.isSimpleMode && !appStore.backendModeEnabled) {
+    if (authStore.isEnterpriseAdmin) return t('orgDashboard.enterpriseDescription')
+    if (authStore.isTeamAdmin) return t('orgDashboard.teamDescription')
+  }
   const descKey = routeMetaKeys.value.descriptionKey
   if (descKey) {
     return t(descKey)

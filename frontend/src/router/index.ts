@@ -18,6 +18,13 @@ import { resolveRouteDocumentTitle } from './title'
  * Route definitions with lazy loading
  */
 const routes: RouteRecordRaw[] = [
+  { path: '/admin/enterprises', name: 'AdminEnterprises', component: () => import('@/views/enterprise/EnterprisesView.vue'), meta: { requiresAuth: true, requiresAdmin: true, requiresTeams: true, title: 'Enterprise management', titleKey: 'enterprise.title' } },
+  { path: '/my-enterprise', name: 'MyEnterprise', component: () => import('@/views/enterprise/EnterprisesView.vue'), meta: { requiresAuth: true, requiresEnterpriseAdmin: true, requiresTeams: true, title: 'My enterprise', titleKey: 'enterprise.mine' } },
+  { path: '/admin/teams', name: 'AdminTeams', component: () => import('@/views/team/TeamsView.vue'), meta: { requiresAuth: true, requiresAdmin: true, requiresTeams: true, title: 'Team management', titleKey: 'teams.title' } },
+  { path: '/team', name: 'TeamManagement', redirect: to => ({ path: '/my-team', query: to.query, hash: to.hash }) },
+  { path: '/my-team', name: 'MyTeam', component: () => import('@/views/team/TeamsView.vue'), meta: { requiresAuth: true, requiresTeams: true, title: 'My team', titleKey: 'teams.mine' } },
+  { path: '/team-invite', name: 'TeamInvitation', component: () => import('@/views/team/TeamsView.vue'), meta: { requiresAuth: true, requiresTeams: true, title: 'Team invitation', titleKey: 'teams.accept' } },
+
   // ==================== Setup Routes ====================
   {
     path: '/setup',
@@ -882,6 +889,18 @@ router.beforeEach(async (to, _from, next) => {
     })
     return
   }
+
+  if (to.meta.requiresTeams) {
+    try {
+      await authStore.refreshUser()
+      if (!appStore.publicSettingsLoaded) await appStore.fetchPublicSettings()
+    } catch { next('/dashboard'); return }
+    if (authStore.isSimpleMode || appStore.backendModeEnabled || (to.meta.requiresEnterpriseAdmin && !authStore.isEnterpriseAdmin)) {
+      next('/dashboard'); return
+    }
+  }
+
+  if (to.name === 'MyTeam' && authStore.isEnterpriseAdmin) { next('/my-enterprise'); return }
 
   // Check admin requirement
   if (requiresAdmin && !authStore.isAdmin) {

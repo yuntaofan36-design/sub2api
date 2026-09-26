@@ -53,6 +53,12 @@ func prepareSeedanceCompletionBilling(ctx context.Context, h *OpenAIGatewayHandl
 		return nil
 	}
 	merged := *result
+	submittedAt, parseErr := time.Parse(time.RFC3339Nano, pending.CreatedAt)
+	if parseErr != nil {
+		submittedAt = time.Unix(0, 0).UTC()
+	}
+	merged.RequestSubmittedAt = &submittedAt
+	merged.OrganizationMembershipID = pending.OrganizationMembershipID
 	merged.Model = pending.Model
 	merged.BillingModel = firstNonEmptyString(pending.BillingModel, pending.Model)
 	merged.UpstreamModel = firstNonEmptyString(pending.UpstreamModel, result.UpstreamModel)

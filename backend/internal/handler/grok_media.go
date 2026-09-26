@@ -478,12 +478,13 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			// model/duration/resolution so status can still price if upstream omits them.
 			// Retry once: missing pending causes silent underpricing (status omits resolution).
 			pending := service.GrokVideoPendingBilling{
-				Model:                requestModel,
-				BillingModel:         firstNonEmptyString(result.BillingModel, requestModel),
-				UpstreamModel:        result.UpstreamModel,
-				VideoResolution:      result.VideoResolution,
-				VideoDurationSeconds: result.VideoDurationSeconds,
-				OriginalModel:        clientRequestedModel(c, requestModel),
+				OrganizationMembershipID: apiKey.UsageMembershipID,
+				Model:                    requestModel,
+				BillingModel:             firstNonEmptyString(result.BillingModel, requestModel),
+				UpstreamModel:            result.UpstreamModel,
+				VideoResolution:          result.VideoResolution,
+				VideoDurationSeconds:     result.VideoDurationSeconds,
+				OriginalModel:            clientRequestedModel(c, requestModel),
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
@@ -645,6 +646,19 @@ func prepareGrokVideoCompletionBilling(
 	}
 	// Re-merge with pending: resolution is request-only; model/duration fill gaps.
 	merged := *statusResult
+	// Missing legacy task metadata must never attribute to the polling user's current team.
+	submittedAt := time.Unix(0, 0).UTC()
+	if pending != nil {
+		if parsed, err := time.Parse(time.RFC3339Nano, pending.CreatedAt); err == nil {
+			submittedAt = parsed
+		}
+	}
+	merged.RequestSubmittedAt = &submittedAt
+	noMembership := int64(0)
+	merged.OrganizationMembershipID = &noMembership
+	if pending != nil {
+		merged.OrganizationMembershipID = pending.OrganizationMembershipID
+	}
 	if pending != nil {
 		if strings.TrimSpace(merged.Model) == "" {
 			merged.Model = firstNonEmptyString(pending.BillingModel, pending.Model, pending.OriginalModel)

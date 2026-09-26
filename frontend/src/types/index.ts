@@ -64,6 +64,8 @@ export interface UserProfileSourceContext {
 }
 
 export interface User {
+  enterprise?: import('@/api/enterprises').EnterpriseSummary | null
+  team?: import('@/api/teams').TeamSummary | null
   id: number
   username: string
   email: string
@@ -84,7 +86,7 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: 'admin' | 'user' // User role for authorization
+  role: 'admin' | 'enterprise_admin' | 'team_admin' | 'user' // User role for authorization
   balance: number // User balance for API usage
   frozen_balance?: number // Balance currently held by async batch jobs
   concurrency: number // Allowed concurrent requests
@@ -727,6 +729,8 @@ export interface CompositeRouteDecision {
 }
 
 export interface ApiKey {
+  team_id?: number | null
+  team_membership_id?: number | null
   id: number
   user_id: number
   key: string
@@ -2074,7 +2078,7 @@ export interface UpdateUserRequest {
   password?: string
   username?: string
   notes?: string
-  role?: 'admin' | 'user'
+  role?: 'admin' | 'enterprise_admin' | 'team_admin' | 'user'
   balance?: number
   concurrency?: number
   rpm_limit?: number

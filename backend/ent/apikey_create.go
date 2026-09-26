@@ -73,6 +73,34 @@ func (_c *APIKeyCreate) SetUserID(v int64) *APIKeyCreate {
 	return _c
 }
 
+// SetTeamID sets the "team_id" field.
+func (_c *APIKeyCreate) SetTeamID(v int64) *APIKeyCreate {
+	_c.mutation.SetTeamID(v)
+	return _c
+}
+
+// SetNillableTeamID sets the "team_id" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableTeamID(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetTeamID(*v)
+	}
+	return _c
+}
+
+// SetTeamMembershipID sets the "team_membership_id" field.
+func (_c *APIKeyCreate) SetTeamMembershipID(v int64) *APIKeyCreate {
+	_c.mutation.SetTeamMembershipID(v)
+	return _c
+}
+
+// SetNillableTeamMembershipID sets the "team_membership_id" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableTeamMembershipID(v *int64) *APIKeyCreate {
+	if v != nil {
+		_c.SetTeamMembershipID(*v)
+	}
+	return _c
+}
+
 // SetKey sets the "key" field.
 func (_c *APIKeyCreate) SetKey(v string) *APIKeyCreate {
 	_c.mutation.SetKey(v)
@@ -522,6 +550,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.DeletedAt(); ok {
 		_spec.SetField(apikey.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
+	}
+	if value, ok := _c.mutation.TeamID(); ok {
+		_spec.SetField(apikey.FieldTeamID, field.TypeInt64, value)
+		_node.TeamID = &value
+	}
+	if value, ok := _c.mutation.TeamMembershipID(); ok {
+		_spec.SetField(apikey.FieldTeamMembershipID, field.TypeInt64, value)
+		_node.TeamMembershipID = &value
 	}
 	if value, ok := _c.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
@@ -1076,6 +1112,12 @@ func (u *APIKeyUpsertOne) UpdateNewValues() *APIKeyUpsertOne {
 	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
 		if _, exists := u.create.mutation.CreatedAt(); exists {
 			s.SetIgnore(apikey.FieldCreatedAt)
+		}
+		if _, exists := u.create.mutation.TeamID(); exists {
+			s.SetIgnore(apikey.FieldTeamID)
+		}
+		if _, exists := u.create.mutation.TeamMembershipID(); exists {
+			s.SetIgnore(apikey.FieldTeamMembershipID)
 		}
 	}))
 	return u
@@ -1713,6 +1755,12 @@ func (u *APIKeyUpsertBulk) UpdateNewValues() *APIKeyUpsertBulk {
 		for _, b := range u.create.builders {
 			if _, exists := b.mutation.CreatedAt(); exists {
 				s.SetIgnore(apikey.FieldCreatedAt)
+			}
+			if _, exists := b.mutation.TeamID(); exists {
+				s.SetIgnore(apikey.FieldTeamID)
+			}
+			if _, exists := b.mutation.TeamMembershipID(); exists {
+				s.SetIgnore(apikey.FieldTeamMembershipID)
 			}
 		}
 	}))

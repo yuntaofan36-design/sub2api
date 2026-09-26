@@ -338,7 +338,7 @@
               </div>
               <!-- Reset button -->
               <button
-                v-if="row.usage_5h > 0 || row.usage_1d > 0 || row.usage_7d > 0"
+                v-if="!row.team_id && (row.usage_5h > 0 || row.usage_1d > 0 || row.usage_7d > 0)"
                 @click.stop="confirmResetRateLimitFromTable(row)"
                 class="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                 :title="t('keys.resetRateLimitUsage')"
@@ -411,6 +411,7 @@
               </button>
               <!-- Toggle Status Button -->
               <button
+                v-if="!row.team_id"
                 @click="toggleKeyStatus(row)"
                 :class="[
                   'flex flex-col items-center gap-0.5 rounded-lg p-1.5 transition-colors',
@@ -425,6 +426,7 @@
               </button>
               <!-- Edit Button -->
               <button
+                v-if="!row.team_id"
                 @click="editKey(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -433,6 +435,7 @@
               </button>
               <!-- Delete Button -->
               <button
+                v-if="!row.team_id"
                 @click="confirmDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >

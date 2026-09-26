@@ -208,7 +208,9 @@ type UsageLog struct {
 	VideoResolution      *string
 	VideoDurationSeconds *int
 
-	CreatedAt time.Time
+	RequestSubmittedAt       *time.Time
+	OrganizationMembershipID *int64
+	CreatedAt                time.Time
 
 	User         *User
 	APIKey       *APIKey

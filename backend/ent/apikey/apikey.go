@@ -23,6 +23,10 @@ const (
 	FieldDeletedAt = "deleted_at"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
+	// FieldTeamID holds the string denoting the team_id field in the database.
+	FieldTeamID = "team_id"
+	// FieldTeamMembershipID holds the string denoting the team_membership_id field in the database.
+	FieldTeamMembershipID = "team_membership_id"
 	// FieldKey holds the string denoting the key field in the database.
 	FieldKey = "key"
 	// FieldName holds the string denoting the name field in the database.
@@ -99,6 +103,8 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldDeletedAt,
 	FieldUserID,
+	FieldTeamID,
+	FieldTeamMembershipID,
 	FieldKey,
 	FieldName,
 	FieldGroupID,
@@ -196,6 +202,16 @@ func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
+}
+
+// ByTeamID orders the results by the team_id field.
+func ByTeamID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTeamID, opts...).ToFunc()
+}
+
+// ByTeamMembershipID orders the results by the team_membership_id field.
+func ByTeamMembershipID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTeamMembershipID, opts...).ToFunc()
 }
 
 // ByKey orders the results by the key field.

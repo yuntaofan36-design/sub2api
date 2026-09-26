@@ -740,6 +740,8 @@ export default {
       createdAt: 'Created',
       totalRecharged: 'Total Recharged',
       roles: {
+        enterprise_admin: 'Enterprise administrator',
+        team_admin: 'Team administrator',
         admin: 'Admin',
         user: 'User'
       },

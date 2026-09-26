@@ -76,9 +76,11 @@ type BatchImageReferenceInput struct {
 }
 
 type BatchImageOwner struct {
-	UserID   int64
-	APIKeyID int64
-	GroupID  *int64
+	RequestSubmittedAt       *time.Time
+	OrganizationMembershipID *int64
+	UserID                   int64
+	APIKeyID                 int64
+	GroupID                  *int64
 }
 
 type BatchImagePublicService struct {
@@ -258,31 +260,33 @@ func (s *BatchImagePublicService) Submit(ctx context.Context, owner BatchImageOw
 	holdID := BatchImageHoldRequestID(batchID)
 	holdAmount := pricingSnapshot.HoldAmount
 	job, err := s.Repo.CreateBatchImageJob(ctx, CreateBatchImageJobParams{
-		BatchID:                 batchID,
-		UserID:                  owner.UserID,
-		APIKeyID:                &apiKeyID,
-		AccountID:               &accountID,
-		Provider:                provider.Name(),
-		Model:                   normalized.Model,
-		TaskName:                normalized.TaskName,
-		ParentBatchID:           parentBatchID,
-		Status:                  BatchImageJobStatusCreated,
-		ItemCount:               len(normalized.Items),
-		EstimatedCost:           pricingSnapshot.EstimatedCost,
-		HoldAmount:              &holdAmount,
-		BaseUnitPrice:           pricingSnapshot.BaseUnitPrice,
-		GroupRateMultiplier:     pricingSnapshot.GroupRateMultiplier,
-		AccountRateMultiplier:   pricingSnapshot.AccountRateMultiplier,
-		BatchDiscountMultiplier: pricingSnapshot.BatchDiscountMultiplier,
-		HoldMultiplier:          pricingSnapshot.HoldMultiplier,
-		BillableUnitPrice:       pricingSnapshot.BillableUnitPrice,
-		HoldUnitPrice:           pricingSnapshot.HoldUnitPrice,
-		PricingSnapshotVersion:  1,
-		Currency:                "USD",
-		HoldID:                  &holdID,
-		IdempotencyKey:          batchImageOptionalStringPtr(idempotencyKey),
-		RequestHash:             batchImageStringPtr(requestHash),
-		SessionID:               normalized.SessionID,
+		RequestSubmittedAt:       owner.RequestSubmittedAt,
+		OrganizationMembershipID: owner.OrganizationMembershipID,
+		BatchID:                  batchID,
+		UserID:                   owner.UserID,
+		APIKeyID:                 &apiKeyID,
+		AccountID:                &accountID,
+		Provider:                 provider.Name(),
+		Model:                    normalized.Model,
+		TaskName:                 normalized.TaskName,
+		ParentBatchID:            parentBatchID,
+		Status:                   BatchImageJobStatusCreated,
+		ItemCount:                len(normalized.Items),
+		EstimatedCost:            pricingSnapshot.EstimatedCost,
+		HoldAmount:               &holdAmount,
+		BaseUnitPrice:            pricingSnapshot.BaseUnitPrice,
+		GroupRateMultiplier:      pricingSnapshot.GroupRateMultiplier,
+		AccountRateMultiplier:    pricingSnapshot.AccountRateMultiplier,
+		BatchDiscountMultiplier:  pricingSnapshot.BatchDiscountMultiplier,
+		HoldMultiplier:           pricingSnapshot.HoldMultiplier,
+		BillableUnitPrice:        pricingSnapshot.BillableUnitPrice,
+		HoldUnitPrice:            pricingSnapshot.HoldUnitPrice,
+		PricingSnapshotVersion:   1,
+		Currency:                 "USD",
+		HoldID:                   &holdID,
+		IdempotencyKey:           batchImageOptionalStringPtr(idempotencyKey),
+		RequestHash:              batchImageStringPtr(requestHash),
+		SessionID:                normalized.SessionID,
 	})
 	if err != nil {
 		return nil, err

@@ -52,6 +52,7 @@ func SkipAudit(c *gin.Context) {
 // scalar, non-secret operation summaries. Request bodies and arbitrary maps
 // are never accepted through this channel.
 var auditExtraAllowedKeys = map[string]struct{}{
+	"enterprise_id": {}, "team_id": {}, "target_user_id": {},
 	"result": {}, "error_code": {}, "enabled": {}, "blocking_enabled": {},
 	"config_version": {}, "endpoint_count": {}, "scanner_count": {},
 	"all_groups": {}, "group_count": {}, "guard_endpoint_id": {},
@@ -109,15 +110,17 @@ func truncateAuditExtraString(value string, limit int) string {
 
 // auditSensitiveReads 需要审计的敏感 GET 读取（method+FullPath → 动作名）。
 var auditSensitiveReads = map[string]string{
-	"GET /api/v1/admin/accounts/data":             "admin.accounts.export",
-	"GET /api/v1/admin/proxies/data":              "admin.proxies.export",
-	"GET /api/v1/admin/redeem-codes/export":       "admin.redeem_codes.export",
-	"GET /api/v1/admin/backups/:id/download-url":  "admin.backups.download",
-	"GET /api/v1/admin/settings/admin-api-key":    "admin.admin_api_key.read",
-	"GET /api/v1/admin/users/:id/api-keys":        "admin.users.api_keys.read",
-	"GET /api/v1/admin/groups/:id/api-keys":       "admin.groups.api_keys.read",
-	"GET /api/v1/admin/backups/s3-config":         "admin.backups.s3_config.read",
-	"GET /api/v1/admin/data-management/s3/config": "admin.data_management.s3_config.read",
+	"GET /api/v1/teams/:teamID/usage/export":       "teams.usage.export",
+	"GET /api/v1/teams/:teamID/keys/:keyID/secret": "teams.keys.read_secret",
+	"GET /api/v1/admin/accounts/data":              "admin.accounts.export",
+	"GET /api/v1/admin/proxies/data":               "admin.proxies.export",
+	"GET /api/v1/admin/redeem-codes/export":        "admin.redeem_codes.export",
+	"GET /api/v1/admin/backups/:id/download-url":   "admin.backups.download",
+	"GET /api/v1/admin/settings/admin-api-key":     "admin.admin_api_key.read",
+	"GET /api/v1/admin/users/:id/api-keys":         "admin.users.api_keys.read",
+	"GET /api/v1/admin/groups/:id/api-keys":        "admin.groups.api_keys.read",
+	"GET /api/v1/admin/backups/s3-config":          "admin.backups.s3_config.read",
+	"GET /api/v1/admin/data-management/s3/config":  "admin.data_management.s3_config.read",
 }
 
 // auditActionOverrides 变更类请求的动作名精确映射（未命中时自动推导）。

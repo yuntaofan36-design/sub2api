@@ -719,6 +719,9 @@ const flagBatchImageAccess = () => canUseBatchImage.value
 // 可用渠道紧挨渠道状态之上，让用户"先看自己能用什么、再看对应状态"。
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
+  if (!appStore.backendModeEnabled && !authStore.isSimpleMode && !isAdmin.value) {
+    items.push(authStore.isEnterpriseAdmin ? { path: '/my-enterprise', label: t('enterprise.mine'), icon: UsersIcon } : { path: '/my-team', label: t('teams.mine'), icon: UsersIcon })
+  }
   if (withDashboard) {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
   }
@@ -777,6 +780,8 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/enterprises', label: t('enterprise.title'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: () => !appStore.backendModeEnabled },
+    { path: '/admin/teams', label: t('teams.title'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: () => !appStore.backendModeEnabled },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
     {
