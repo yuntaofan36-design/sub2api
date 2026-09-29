@@ -2,7 +2,28 @@
   <AppLayout>
     <div class="space-y-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div v-if="platform && !teamID" class="flex w-full flex-wrap items-center gap-3 md:w-auto">
+          <div class="w-full md:w-80">
+            <SearchInput
+              v-model="searchInput"
+              :placeholder="t('teams.searchPlaceholder')"
+              @search="handleSearch"
+            />
+          </div>
+          <div class="w-full sm:w-64">
+            <Select
+              v-model="enterpriseFilter"
+              :aria-label="t('enterprise.filter')"
+              :options="[
+                { value: 0, label: t('enterprise.all') },
+                { value: -1, label: t('enterprise.standalone') },
+                ...enterpriseOptions.map((e) => ({ value: e.id, label: e.name })),
+              ]"
+              @update:model-value="applyListFilters"
+            />
+          </div>
+        </div>
+        <div v-if="overview || (platform && teamID)">
           <button
             v-if="platform && teamID"
             class="mb-2 text-sm text-primary-600"
@@ -10,30 +31,23 @@
           >
             ← {{ t("teams.back") }}
           </button>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{
-              platform ? overview?.name || t("teams.title") : t("teams.mine")
-            }}
-          </h1>
           <div
-            v-if="!platform && overview"
-            class="mt-2 flex flex-wrap items-center gap-2"
+            v-if="overview"
+            class="flex flex-wrap items-center gap-2"
           >
-            <span
-              class="text-sm font-medium text-gray-700 dark:text-gray-300"
-              >{{ overview.name }}</span
+            <h2
+              class="text-xl font-semibold text-gray-900 dark:text-white"
+              >{{ overview.name }}</h2
             >
             <span
+              v-if="!platform"
               class="badge"
               :class="auth.isTeamAdmin ? 'badge-orange' : 'badge-gray'"
               >{{ t(`admin.users.roles.${auth.user?.role || "user"}`) }}</span
             >
           </div>
-          <p v-if="overview" class="mt-1 text-sm text-gray-500">
-            {{ t(canViewTeam ? "orgDashboard.managementHint" : "teams.costHint") }}
-          </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="ml-auto flex flex-wrap gap-2">
           <router-link
             v-if="auth.isTeamAdmin"
             to="/dashboard?scope=personal"
@@ -76,21 +90,6 @@
         </button>
       </div>
       <div v-else-if="platform && !teamID" class="card overflow-hidden">
-        <div class="max-w-sm p-4">
-          <label class="input-label">{{ t("enterprise.filter") }}</label
-          ><Select
-            v-model="enterpriseFilter"
-            :options="[
-              { value: 0, label: t('enterprise.all') },
-              { value: -1, label: t('enterprise.standalone') },
-              ...enterpriseOptions.map((e) => ({ value: e.id, label: e.name })),
-            ]"
-            @update:model-value="
-              page = 1;
-              initialize();
-            "
-          />
-        </div>
         <DataTable
           :columns="teamColumns"
           :data="teams"
@@ -172,6 +171,7 @@
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <button
+                type="button"
                 :disabled="!!actionLoadingID"
                 :title="t('teams.editTeam')"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-primary-400"
@@ -182,6 +182,7 @@
                 }}</span>
               </button>
               <button
+                type="button"
                 :disabled="!!actionLoadingID"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                 @click="selectTeam(row.id)"
@@ -191,6 +192,7 @@
                 }}</span>
               </button>
               <button
+                type="button"
                 :disabled="!!actionLoadingID"
                 aria-haspopup="menu"
                 :aria-expanded="actionMenuTeam?.id === row.id"
@@ -211,30 +213,14 @@
             </div>
           </template>
         </DataTable>
-        <div class="flex items-center justify-between p-4">
-          <span>{{ t("teams.total", { count: total }) }}</span>
-          <div class="flex gap-2">
-            <button
-              class="btn btn-secondary"
-              :disabled="page === 1 || loading"
-              @click="
-                page--;
-                initialize();
-              "
-            >
-              {{ t("teams.previous") }}</button
-            ><button
-              class="btn btn-secondary"
-              :disabled="page * 25 >= total || loading"
-              @click="
-                page++;
-                initialize();
-              "
-            >
-              {{ t("teams.next") }}
-            </button>
-          </div>
-        </div>
+        <Pagination
+          v-if="total > 0"
+          :total="total"
+          :page="page"
+          :page-size="pageSize"
+          @update:page="changePage"
+          @update:page-size="changePageSize"
+        />
       </div>
       <div
         v-else-if="!loading && !overview && !error"
@@ -274,7 +260,10 @@
             </p>
           </div>
           <div class="card p-5">
-            <p class="text-sm text-gray-500">{{ t("teams.cost") }}</p>
+            <div class="flex items-center text-sm text-gray-500">
+              <span>{{ t("teams.cost") }}</span>
+              <HelpTooltip :content="t(canViewTeam ? 'orgDashboard.managementHint' : 'teams.costHint')" />
+            </div>
             <p class="mt-2 text-2xl font-semibold">
               {{ money(overview.usage.cost) }}
             </p>
@@ -310,18 +299,27 @@
             </div>
           </template>
         </div>
-        <div class="flex flex-wrap gap-2 border-b pb-3 dark:border-dark-600">
+        <div class="tabs inline-flex max-w-full flex-wrap">
           <button
             v-for="tab in tabs"
             :key="tab"
-            class="btn"
-            :class="tab === section ? 'btn-primary' : 'btn-secondary'"
+            type="button"
+            class="tab"
+            :class="tab === section ? 'tab-active' : ''"
             @click="changeSection(tab)"
           >
             {{ t(`teams.${tab}`) }}
           </button>
         </div>
         <div class="flex flex-wrap justify-between gap-3">
+          <div v-if="section !== 'overview'" class="w-full md:w-80">
+            <SearchInput
+              :key="section"
+              v-model="searchInput"
+              :placeholder="searchPlaceholder"
+              @search="handleSearch"
+            />
+          </div>
           <div class="flex flex-wrap gap-2">
             <template v-if="section === 'members' && canManage"
               ><button class="btn btn-primary" @click="open('createMember')">
@@ -424,21 +422,24 @@
           {{ t("teams.keyHint") }}
         </p>
         <div v-if="section !== 'overview'" class="card overflow-x-auto">
-          <table class="w-full whitespace-nowrap text-left text-sm">
+          <table class="w-full min-w-max whitespace-nowrap text-left text-sm">
             <thead>
               <tr
                 class="border-b bg-gray-50 dark:border-dark-600 dark:bg-dark-800"
               >
-                <th v-for="col in columns" :key="col.key" class="px-4 py-3">
+                <th
+                  v-for="col in columns"
+                  :key="col.key"
+                  :class="['px-4 py-3', col.class]"
+                >
                   {{ t(`teams.${col.label}`) }}
                 </th>
                 <th
                   v-if="
-                    section !== 'usage' &&
-                    section !== 'ledger' &&
-                    section !== 'grants'
+                    section === 'keys' ||
+                    (canManage && (section === 'members' || section === 'invitations'))
                   "
-                  class="px-4 py-3"
+                  class="min-w-[180px] px-4 py-3"
                 >
                   {{ t("teams.actions") }}
                 </th>
@@ -453,12 +454,13 @@
                 <td
                   v-for="col in columns"
                   :key="col.key"
-                  class="px-4 py-4"
-                  :class="
+                  :class="[
+                    'px-4 py-4',
+                    col.class,
                     col.key === 'details'
                       ? 'max-w-md whitespace-normal break-words'
-                      : ''
-                  "
+                      : '',
+                  ]"
                 >
                   <span
                     v-if="col.key === 'role'"
@@ -474,18 +476,31 @@
                   >
                   <template v-else>{{ cell(row, col.key) }}</template>
                 </td>
-                <td v-if="section === 'members' && canManage" class="px-4 py-3">
-                  <div class="flex gap-2">
+                <td
+                  v-if="section === 'members' && canManage"
+                  class="min-w-[220px] px-4 py-3"
+                >
+                  <div class="flex items-center gap-1">
                     <button
                       v-if="row.status === 'active'"
-                      class="btn btn-secondary"
+                      type="button"
+                      class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                       @click="open('allocate', row)"
                     >
-                      {{ t("teams.allocate") }}</button
-                    ><template
+                      <Icon name="gift" size="sm" />
+                      <span class="text-xs">{{ t("teams.allocate") }}</span>
+                    </button>
+                    <template
                       v-if="row.role === 'user' && row.status !== 'left'"
-                      ><button
-                        class="btn btn-secondary"
+                    >
+                      <button
+                        type="button"
+                        :class="[
+                          'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
+                          row.status === 'active'
+                            ? 'hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400'
+                            : 'hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400',
+                        ]"
                         @click="
                           memberStatus(
                             row,
@@ -493,60 +508,73 @@
                           )
                         "
                       >
-                        {{
+                        <Icon :name="row.status === 'active' ? 'ban' : 'checkCircle'" size="sm" />
+                        <span class="text-xs">{{
                           t(
                             row.status === "active"
                               ? "teams.pause"
                               : "teams.resume",
                           )
-                        }}</button
-                      ><button
-                        class="btn btn-secondary text-red-600"
+                        }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         @click="memberStatus(row, 'left')"
                       >
-                        {{ t("teams.remove") }}
-                      </button></template
-                    >
+                        <Icon name="trash" size="sm" />
+                        <span class="text-xs">{{ t("teams.remove") }}</span>
+                      </button>
+                    </template>
                   </div>
                 </td>
-                <td v-if="section === 'keys'" class="px-4 py-3">
-                  <div class="flex gap-2">
+                <td v-if="section === 'keys'" class="min-w-[180px] px-4 py-3">
+                  <div class="flex items-center gap-1">
                     <button
                       v-if="canManage && row.member_status === 'active'"
-                      class="btn btn-secondary"
+                      type="button"
+                      class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                       @click="open('editKey', row)"
                     >
-                      {{ t("teams.edit") }}</button
-                    ><button
+                      <Icon name="edit" size="sm" />
+                      <span class="text-xs">{{ t("teams.edit") }}</span>
+                    </button>
+                    <button
                       v-if="
                         row.user_id === auth.user?.id &&
                         row.member_status === 'active'
                       "
-                      class="btn btn-secondary"
+                      type="button"
+                      class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
                       @click="showSecret(row)"
                     >
-                      {{ t("teams.copy") }}
+                      <Icon name="copy" size="sm" />
+                      <span class="text-xs">{{ t("teams.copy") }}</span>
                     </button>
                   </div>
                 </td>
                 <td
                   v-if="section === 'invitations' && canManage"
-                  class="px-4 py-3"
+                  class="min-w-[180px] px-4 py-3"
                 >
-                  <button
-                    v-if="!row.accepted_at && !row.revoked_at"
-                    class="btn btn-secondary"
-                    @click="
-                      confirmAction(t('teams.confirmHint'), () =>
-                        request(
-                          'delete',
-                          `/teams/${teamID}/invitations/${row.id}`,
-                        ),
-                      )
-                    "
-                  >
-                    {{ t("teams.revoke") }}
-                  </button>
+                  <div class="flex items-center gap-1">
+                    <button
+                      v-if="!row.accepted_at && !row.revoked_at"
+                      type="button"
+                      class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      @click="
+                        confirmAction(t('teams.confirmHint'), () =>
+                          request(
+                            'delete',
+                            `/teams/${teamID}/invitations/${row.id}`,
+                          ),
+                        )
+                      "
+                    >
+                      <Icon name="xCircle" size="sm" />
+                      <span class="text-xs">{{ t("teams.revoke") }}</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -558,35 +586,14 @@
             {{ t("teams.empty") }}
           </p>
         </div>
-        <div
-          v-if="section !== 'overview'"
-          class="flex items-center justify-between"
-        >
-          <span class="text-sm text-gray-500">{{
-            t("teams.total", { count: total })
-          }}</span>
-          <div class="flex gap-2">
-            <button
-              class="btn btn-secondary"
-              :disabled="page === 1 || loading"
-              @click="
-                page--;
-                loadRows();
-              "
-            >
-              {{ t("teams.previous") }}</button
-            ><button
-              class="btn btn-secondary"
-              :disabled="page * 25 >= total || loading"
-              @click="
-                page++;
-                loadRows();
-              "
-            >
-              {{ t("teams.next") }}
-            </button>
-          </div>
-        </div>
+        <Pagination
+          v-if="section !== 'overview' && total > 0"
+          :total="total"
+          :page="page"
+          :page-size="pageSize"
+          @update:page="changePage"
+          @update:page-size="changePageSize"
+        />
       </template>
     </div>
     <Teleport to="body">
@@ -607,6 +614,7 @@
         <button
           v-for="action in teamMenuActions"
           :key="action.key"
+          type="button"
           role="menuitem"
           class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none dark:text-gray-300 dark:hover:bg-dark-700 dark:focus-visible:bg-dark-700"
           @click="openTeamAction(action.key, actionMenuTeam)"
@@ -952,6 +960,10 @@ import AppLayout from "@/components/layout/AppLayout.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
 import Select from "@/components/common/Select.vue";
 import DataTable from "@/components/common/DataTable.vue";
+import SearchInput from "@/components/common/SearchInput.vue";
+import Pagination from "@/components/common/Pagination.vue";
+import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
+import HelpTooltip from "@/components/common/HelpTooltip.vue";
 import Icon from "@/components/icons/Icon.vue";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { useStepUp, isStepUpCancelled } from "@/composables/useStepUp";
@@ -985,7 +997,21 @@ const loading = ref(false),
   formError = ref(""),
   section = ref("overview"),
   page = ref(1),
+  pageSize = ref(getPersistedPageSize()),
   total = ref(0);
+const searchInput = ref(""),
+  searchQuery = ref("");
+const searchPlaceholder = computed(() => {
+  const keys: Record<string, string> = {
+    members: "searchMembers",
+    keys: "searchKeys",
+    grants: "searchGrants",
+    invitations: "searchInvitations",
+    usage: "searchUsage",
+    ledger: "searchLedger",
+  };
+  return t(`teams.${keys[section.value] || 'searchPlaceholder'}`);
+});
 const records = ref<TeamRow[]>([]),
   members = ref<TeamRow[]>([]),
   grants = ref<TeamRow[]>([]),
@@ -1005,13 +1031,13 @@ let actionMenuAnchor: DOMRect | null = null;
 let actionEpoch = 0;
 let dialogEpoch = 0;
 const teamColumns = computed(() => [
-  { key: "name", label: t("teams.name") },
-  { key: "administrators", label: t("teams.administrators") },
-  { key: "enterprise_name", label: t("enterprise.filter") },
-  { key: "status", label: t("teams.status") },
-  { key: "member_count", label: t("teams.members") },
-  { key: "balance", label: t("teams.available") },
-  { key: "actions", label: t("teams.actions") },
+  { key: "name", label: t("teams.name"), class: "min-w-[180px]" },
+  { key: "administrators", label: t("teams.administrators"), class: "min-w-[260px]" },
+  { key: "enterprise_name", label: t("enterprise.filter"), class: "min-w-[180px]" },
+  { key: "status", label: t("teams.status"), class: "min-w-[110px]" },
+  { key: "member_count", label: t("teams.members"), class: "min-w-[120px]" },
+  { key: "balance", label: t("teams.available"), class: "min-w-[140px]" },
+  { key: "actions", label: t("teams.actions"), class: "min-w-[220px]" },
 ]);
 const teamMenuActions = [
   { key: "appoint", icon: "users", color: "text-orange-500" },
@@ -1173,54 +1199,54 @@ const limitFields = [
   { key: "rate_limit_1d", label: "rate1d" },
   { key: "rate_limit_7d", label: "rate7d" },
 ] as const;
-const columnSets: Record<string, { key: keyof TeamRow; label: string }[]> = {
+const columnSets: Record<string, { key: keyof TeamRow; label: string; class: string }[]> = {
   members: [
-    { key: "email", label: "email" },
-    { key: "username", label: "username" },
-    { key: "role", label: "user" },
-    { key: "status", label: "status" },
-    { key: "allocated_balance", label: "allocated" },
+    { key: "email", label: "email", class: "min-w-[240px]" },
+    { key: "username", label: "username", class: "min-w-[160px]" },
+    { key: "role", label: "user", class: "min-w-[130px]" },
+    { key: "status", label: "status", class: "min-w-[120px]" },
+    { key: "allocated_balance", label: "allocated", class: "min-w-[150px]" },
   ],
   keys: [
-    { key: "name", label: "name" },
-    { key: "email", label: "member" },
-    { key: "masked_key", label: "keys" },
-    { key: "group_name", label: "group" },
-    { key: "status", label: "status" },
-    { key: "quota_used", label: "used" },
-    { key: "quota", label: "quota" },
-    { key: "expires_at", label: "expires" },
+    { key: "name", label: "name", class: "min-w-[180px]" },
+    { key: "email", label: "member", class: "min-w-[240px]" },
+    { key: "masked_key", label: "keys", class: "min-w-[180px]" },
+    { key: "group_name", label: "group", class: "min-w-[160px]" },
+    { key: "status", label: "status", class: "min-w-[120px]" },
+    { key: "quota_used", label: "used", class: "min-w-[130px]" },
+    { key: "quota", label: "quota", class: "min-w-[130px]" },
+    { key: "expires_at", label: "expires", class: "min-w-[180px]" },
   ],
   grants: [
-    { key: "group_name", label: "group" },
-    { key: "validity_days", label: "days" },
-    { key: "quantity", label: "quantity" },
-    { key: "remaining", label: "remaining" },
+    { key: "group_name", label: "group", class: "min-w-[180px]" },
+    { key: "validity_days", label: "days", class: "min-w-[100px]" },
+    { key: "quantity", label: "quantity", class: "min-w-[120px]" },
+    { key: "remaining", label: "remaining", class: "min-w-[130px]" },
   ],
   invitations: [
-    { key: "email", label: "email" },
-    { key: "status", label: "status" },
-    { key: "expires_at", label: "expires" },
+    { key: "email", label: "email", class: "min-w-[240px]" },
+    { key: "status", label: "status", class: "min-w-[120px]" },
+    { key: "expires_at", label: "expires", class: "min-w-[180px]" },
   ],
   usage: [
-    { key: "email", label: "member" },
-    { key: "api_key_id", label: "keys" },
-    { key: "model", label: "model" },
-    { key: "input_tokens", label: "inputTokens" },
-    { key: "output_tokens", label: "outputTokens" },
-    { key: "cache_tokens", label: "cacheTokens" },
-    { key: "actual_cost", label: "cost" },
-    { key: "created_at", label: "when" },
+    { key: "email", label: "member", class: "min-w-[240px]" },
+    { key: "api_key_id", label: "keys", class: "min-w-[110px]" },
+    { key: "model", label: "model", class: "min-w-[220px]" },
+    { key: "input_tokens", label: "inputTokens", class: "min-w-[130px]" },
+    { key: "output_tokens", label: "outputTokens", class: "min-w-[130px]" },
+    { key: "cache_tokens", label: "cacheTokens", class: "min-w-[130px]" },
+    { key: "actual_cost", label: "cost", class: "min-w-[140px]" },
+    { key: "created_at", label: "when", class: "min-w-[180px]" },
   ],
   ledger: [
-    { key: "kind", label: "event" },
-    { key: "outcome", label: "result" },
-    { key: "actor_email", label: "actor" },
-    { key: "member_email", label: "recipient" },
-    { key: "amount", label: "amount" },
-    { key: "balance_after", label: "balanceChange" },
-    { key: "details", label: "details" },
-    { key: "created_at", label: "when" },
+    { key: "kind", label: "event", class: "min-w-[180px]" },
+    { key: "outcome", label: "result", class: "min-w-[120px]" },
+    { key: "actor_email", label: "actor", class: "min-w-[240px]" },
+    { key: "member_email", label: "recipient", class: "min-w-[240px]" },
+    { key: "amount", label: "amount", class: "min-w-[140px]" },
+    { key: "balance_after", label: "balanceChange", class: "min-w-[180px]" },
+    { key: "details", label: "details", class: "min-w-[280px]" },
+    { key: "created_at", label: "when", class: "min-w-[180px]" },
   ],
 };
 const columns = computed(() => columnSets[section.value] || []);
@@ -1365,17 +1391,15 @@ async function initialize() {
     if (platform.value) {
       teamID.value = Number(route.query.team || 0);
       if (!teamID.value) {
-        const data = await teamsAPI.list(page.value, enterpriseFilter.value);
         const options: Enterprise[] = [];
         for (let p = 1; ; p++) {
           const res = await enterprisesAPI.list({ page: p, page_size: 200 });
+          if (stamp !== epoch) return;
           options.push(...res.items);
           if (options.length >= res.total || !res.items.length) break;
         }
         enterpriseOptions.value = options;
-        if (stamp !== epoch) return;
-        teams.value = data.items;
-        total.value = data.total;
+        await loadTeamList();
         return;
       }
     } else {
@@ -1386,8 +1410,7 @@ async function initialize() {
     }
     const data = await teamsAPI.overview(teamID.value, mine.value);
     if (stamp !== epoch) return;
-    overview.value = data;
-    if (canViewTeam.value) {
+    if (data.can_view_team && (platform.value ? auth.isAdmin : auth.isTeamAdmin)) {
       const collections = await Promise.all([
         allRows("members"),
         allRows("grants"),
@@ -1400,8 +1423,33 @@ async function initialize() {
       if (stamp !== epoch) return;
       keys.value = ownKeys;
     }
+    overview.value = data;
     if (!tabs.value.includes(section.value)) section.value = tabs.value[0];
     await loadRows();
+  } catch (e) {
+    if (stamp === epoch) error.value = message(e);
+  } finally {
+    if (stamp === epoch) loading.value = false;
+  }
+}
+async function loadTeamList() {
+  closeActionMenu();
+  const stamp = ++epoch;
+  loading.value = true;
+  error.value = "";
+  teams.value = [];
+  try {
+    const data = await teamsAPI.list(page.value, enterpriseFilter.value, searchQuery.value, pageSize.value);
+    if (stamp !== epoch) return;
+    total.value = data.total;
+    pageSize.value = data.page_size;
+    const lastPage = Math.max(1, Math.ceil(data.total / data.page_size));
+    if (page.value > lastPage) {
+      page.value = lastPage;
+      await loadTeamList();
+      return;
+    }
+    teams.value = data.items;
   } catch (e) {
     if (stamp === epoch) error.value = message(e);
   } finally {
@@ -1412,7 +1460,8 @@ function params(): Record<string, unknown> {
   return {
     mine: mine.value,
     page: page.value,
-    page_size: 25,
+    page_size: pageSize.value,
+    search: searchQuery.value,
     member_id: filters.member_id,
     key_id: filters.key_id,
     model: filters.model,
@@ -1428,13 +1477,22 @@ function params(): Record<string, unknown> {
 }
 async function loadRows() {
   if (!teamID.value || section.value === "overview") return;
-  const stamp = epoch;
+  const stamp = ++epoch;
   loading.value = true;
+  error.value = "";
+  records.value = [];
   try {
     const data = await teamsAPI.rows(teamID.value, section.value, params());
     if (stamp !== epoch) return;
-    records.value = data.items;
     total.value = data.total;
+    pageSize.value = data.page_size;
+    const lastPage = Math.max(1, Math.ceil(data.total / data.page_size));
+    if (page.value > lastPage) {
+      page.value = lastPage;
+      await loadRows();
+      return;
+    }
+    records.value = data.items;
   } catch (e) {
     if (stamp === epoch) error.value = message(e);
   } finally {
@@ -1442,9 +1500,40 @@ async function loadRows() {
   }
 }
 async function changeSection(tab: string) {
+  epoch++;
+  loading.value = false;
   section.value = tab;
   page.value = 1;
+  resetSearch();
   await loadRows();
+}
+function resetSearch() {
+  searchInput.value = "";
+  searchQuery.value = "";
+  total.value = 0;
+}
+async function refreshTable() {
+  if (platform.value && !teamID.value) await loadTeamList();
+  else await loadRows();
+}
+async function handleSearch(value: string) {
+  if (value !== searchInput.value) return;
+  searchQuery.value = value.trim();
+  page.value = 1;
+  await refreshTable();
+}
+async function applyListFilters() {
+  page.value = 1;
+  await refreshTable();
+}
+async function changePage(value: number) {
+  page.value = value;
+  await refreshTable();
+}
+async function changePageSize(value: number) {
+  pageSize.value = value;
+  page.value = 1;
+  await refreshTable();
 }
 function selectTeam(id: number) {
   page.value = 1;
@@ -1820,6 +1909,7 @@ async function exportUsage() {
 watch(
   () => route.fullPath,
   () => {
+    resetSearch();
     closeDialog();
     page.value = 1;
     section.value = "overview";
@@ -1837,6 +1927,7 @@ watch(
   [() => auth.user?.role, () => auth.user?.team?.enterprise_status],
   (_next, previous) => {
     if (!previous[0] || route.name !== "MyTeam") return;
+    resetSearch();
     closeDialog();
     confirmation.value = null;
     page.value = 1;

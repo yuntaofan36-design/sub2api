@@ -2,7 +2,14 @@
   <AppLayout>
     <div class="space-y-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div v-if="platform && !enterpriseID" class="w-full md:w-80">
+          <SearchInput
+            v-model="searchInput"
+            :placeholder="t('enterprise.searchPlaceholder')"
+            @search="handleSearch"
+          />
+        </div>
+        <div v-if="current || (platform && enterpriseID)">
           <button
             v-if="platform && enterpriseID"
             class="mb-2 text-sm text-primary-600"
@@ -10,24 +17,14 @@
           >
             ← {{ t("enterprise.back") }}
           </button>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{
-              platform
-                ? current?.name || t("enterprise.title")
-                : t("enterprise.mine")
-            }}
-          </h1>
-          <div v-if="!platform && current" class="mt-2 flex items-center gap-2">
-            <span>{{ current.name }}</span
-            ><span class="badge badge-blue">{{
+          <div v-if="current" class="flex flex-wrap items-center gap-2">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ current.name }}</h2>
+            <span v-if="!platform" class="badge badge-blue">{{
               t("admin.users.roles.enterprise_admin")
             }}</span>
           </div>
-          <p class="mt-2 text-sm text-gray-500">
-            {{ t("enterprise.scopeHint") }}
-          </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="ml-auto flex flex-wrap gap-2">
           <router-link
             v-if="!platform"
             to="/dashboard?scope=personal"
@@ -138,14 +135,13 @@
             {{ t("enterprise.attach") }}
           </button>
         </div>
-        <div
-          class="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-dark-700"
-        >
+        <div class="tabs inline-flex max-w-full flex-wrap">
           <button
             v-for="tab in tabs"
             :key="tab"
-            class="btn"
-            :class="section === tab ? 'btn-primary' : 'btn-secondary'"
+            type="button"
+            class="tab"
+            :class="section === tab ? 'tab-active' : ''"
             @click="changeSection(tab)"
           >
             {{ t(`enterprise.${tab}`) }}
@@ -196,8 +192,16 @@
           </div>
         </template>
         <template v-else>
-          <div v-if="section === 'teams' && canGovern" class="flex justify-end">
-            <button class="btn btn-primary" @click="open('createTeam')">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="w-full md:w-80">
+              <SearchInput
+                :key="section"
+                v-model="searchInput"
+                :placeholder="searchPlaceholder"
+                @search="handleSearch"
+              />
+            </div>
+            <button v-if="section === 'teams' && canGovern" class="btn btn-primary" @click="open('createTeam')">
               {{ t("enterprise.createTeam") }}
             </button>
           </div>
@@ -312,31 +316,16 @@
           </div>
         </template>
       </template>
-      <div
+      <Pagination
         v-if="
-          (platform && !enterpriseID) || (current && section !== 'overview')
+          total > 0 && ((platform && !enterpriseID) || (current && section !== 'overview'))
         "
-        class="flex items-center justify-between"
-      >
-        <span class="text-sm text-gray-500">{{
-          t("teams.total", { count: total })
-        }}</span>
-        <div class="flex gap-2">
-          <button
-            class="btn btn-secondary"
-            :disabled="loading || page === 1"
-            @click="paginate(-1)"
-          >
-            {{ t("teams.previous") }}</button
-          ><button
-            class="btn btn-secondary"
-            :disabled="loading || page * 25 >= total"
-            @click="paginate(1)"
-          >
-            {{ t("teams.next") }}
-          </button>
-        </div>
-      </div>
+        :total="total"
+        :page="page"
+        :page-size="pageSize"
+        @update:page="changePage"
+        @update:page-size="changePageSize"
+      />
     </div>
     <BaseDialog
       :show="!!dialog"
@@ -406,7 +395,7 @@
                   ),
                 },
               ]"
-              @update:model-value="loadChoices"
+              @update:model-value="loadChoices()"
           /></label>
           <p class="text-sm text-gray-500">
             {{
@@ -416,34 +405,6 @@
                   : "enterprise.appointHint",
               )
             }}
-          </p>
-        </template>
-        <template
-          v-if="
-            dialog === 'createEnterprise' ||
-            (dialog === 'leader' && form.promote)
-          "
-        >
-          <label class="block"
-            ><span class="input-label">{{ t("enterprise.searchUser") }}</span>
-            <div class="flex gap-2">
-              <input
-                v-model="search"
-                class="input"
-                type="search"
-                @keydown.enter.prevent="loadChoices"
-              /><button
-                type="button"
-                class="btn btn-secondary shrink-0"
-                :disabled="formLoading"
-                @click="loadChoices"
-              >
-                {{ t("common.search") }}
-              </button>
-            </div></label
-          >
-          <p class="text-sm text-gray-500">
-            {{ t("enterprise.candidateHint") }}
           </p>
         </template>
         <label
@@ -461,12 +422,20 @@
             )
           }}</span
           ><Select
+            :key="`${dialog}:${form.promote}`"
             v-model="form.target_id"
             :options="choiceOptions"
-            :disabled="formLoading"
+            :disabled="saving || (formLoading && !isLeaderCandidateSearch)"
             :searchable="true"
+            :remote="isLeaderCandidateSearch"
+            :loading="formLoading"
+            :search-placeholder="isLeaderCandidateSearch ? t('enterprise.searchUser') : undefined"
             :placeholder="t('enterprise.select')"
+            @search="searchLeaderChoices"
         /></label>
+        <p v-if="isLeaderCandidateSearch" class="text-sm text-gray-500">
+          {{ t("enterprise.candidateHint") }}
+        </p>
         <p
           v-if="dialog === 'attach'"
           class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
@@ -558,12 +527,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
 import DataTable from "@/components/common/DataTable.vue";
+import SearchInput from "@/components/common/SearchInput.vue";
+import Pagination from "@/components/common/Pagination.vue";
+import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import Select from "@/components/common/Select.vue";
 import Icon from "@/components/icons/Icon.vue";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
@@ -597,8 +569,15 @@ const records = ref<Array<TeamRow | EnterpriseAccount | EnterpriseEvent>>([]);
 const loading = ref(false),
   error = ref(""),
   page = ref(1),
+  pageSize = ref(getPersistedPageSize()),
   total = ref(0),
   section = ref("overview");
+const searchInput = ref(""),
+  searchQuery = ref("");
+const searchPlaceholder = computed(() =>
+  t(section.value === "teams" ? "teams.searchPlaceholder" :
+    section.value === "administrators" ? "enterprise.searchAdministrators" : "enterprise.searchEvents"),
+);
 const dates = reactive({ from: "", to: "" });
 const tabs = ["overview", "teams", "administrators", "events"];
 const canGovern = computed(
@@ -612,8 +591,7 @@ const dialog = ref(""),
   formError = ref(""),
   formLoading = ref(false),
   formReady = ref(false),
-  saving = ref(false),
-  search = ref("");
+  saving = ref(false);
 const dialogEntityID = ref(0),
   choices = ref<
     Array<{
@@ -635,6 +613,9 @@ const form = reactive({
   username: "",
   password: "",
 });
+const isLeaderCandidateSearch = computed(
+  () => dialog.value === "createEnterprise" || (dialog.value === "leader" && form.promote),
+);
 let epoch = 0,
   dialogEpoch = 0,
   choicesEpoch = 0;
@@ -667,35 +648,35 @@ const selectionMissing = computed(
     ) && !choiceOptions.value.some((c) => c.value === form.target_id),
 );
 const enterpriseColumns = computed(() => [
-  { key: "name", label: t("enterprise.name") },
-  { key: "leaders", label: t("enterprise.leaders") },
-  { key: "status", label: t("teams.status") },
-  { key: "team_count", label: t("enterprise.teamCount") },
-  { key: "actions", label: t("teams.actions") },
+  { key: "name", label: t("enterprise.name"), class: "min-w-[180px]" },
+  { key: "leaders", label: t("enterprise.leaders"), class: "min-w-[240px]" },
+  { key: "status", label: t("teams.status"), class: "min-w-[110px]" },
+  { key: "team_count", label: t("enterprise.teamCount"), class: "min-w-[120px]" },
+  { key: "actions", label: t("teams.actions"), class: "min-w-[220px]" },
 ]);
 const recordColumns = computed(() =>
   section.value === "teams"
     ? [
-        { key: "name", label: t("teams.name") },
-        { key: "administrators", label: t("teams.administrators") },
-        { key: "status", label: t("teams.status") },
-        { key: "member_count", label: t("teams.members") },
-        { key: "balance", label: t("teams.available") },
-        { key: "actions", label: t("teams.actions") },
+        { key: "name", label: t("teams.name"), class: "min-w-[180px]" },
+        { key: "administrators", label: t("teams.administrators"), class: "min-w-[240px]" },
+        { key: "status", label: t("teams.status"), class: "min-w-[110px]" },
+        { key: "member_count", label: t("teams.members"), class: "min-w-[120px]" },
+        { key: "balance", label: t("teams.available"), class: "min-w-[140px]" },
+        { key: "actions", label: t("teams.actions"), class: "min-w-[220px]" },
       ]
     : section.value === "administrators"
       ? [
-          { key: "email", label: t("teams.admin") },
-          { key: "team_name", label: t("enterprise.team") },
-          { key: "status", label: t("teams.status") },
+          { key: "email", label: t("teams.admin"), class: "min-w-[240px]" },
+          { key: "team_name", label: t("enterprise.team"), class: "min-w-[180px]" },
+          { key: "status", label: t("teams.status"), class: "min-w-[120px]" },
         ]
       : [
-          { key: "created_at", label: t("teams.when") },
-          { key: "team_name", label: t("enterprise.team") },
-          { key: "actor_email", label: t("teams.actor") },
-          { key: "kind", label: t("teams.actions") },
-          { key: "details", label: t("enterprise.details") },
-          { key: "outcome", label: t("teams.result") },
+          { key: "created_at", label: t("teams.when"), class: "min-w-[180px]" },
+          { key: "team_name", label: t("enterprise.team"), class: "min-w-[180px]" },
+          { key: "actor_email", label: t("teams.actor"), class: "min-w-[240px]" },
+          { key: "kind", label: t("teams.actions"), class: "min-w-[180px]" },
+          { key: "details", label: t("enterprise.details"), class: "min-w-[280px]" },
+          { key: "outcome", label: t("teams.result"), class: "min-w-[120px]" },
         ],
 );
 const summaryCards = computed(() => [
@@ -776,14 +757,7 @@ async function initialize() {
       return;
     }
     if (platform.value && !enterpriseID.value) {
-      const result = await enterprisesAPI.list({
-        page: page.value,
-        page_size: 25,
-      });
-      if (stamp === epoch) {
-        enterprises.value = result.items;
-        total.value = result.total;
-      }
+      await loadEnterpriseList();
     } else {
       const [company, aggregate] = await Promise.all([
         enterprisesAPI.current(enterpriseID.value || undefined),
@@ -794,6 +768,33 @@ async function initialize() {
       stats.value = aggregate;
       if (section.value !== "overview") await loadRows();
     }
+  } catch (e) {
+    if (stamp === epoch) error.value = message(e);
+  } finally {
+    if (stamp === epoch) loading.value = false;
+  }
+}
+async function loadEnterpriseList() {
+  const stamp = ++epoch;
+  loading.value = true;
+  error.value = "";
+  enterprises.value = [];
+  try {
+    const result = await enterprisesAPI.list({
+      page: page.value,
+      page_size: pageSize.value,
+      search: searchQuery.value,
+    });
+    if (stamp !== epoch) return;
+    total.value = result.total;
+    pageSize.value = result.page_size;
+    const lastPage = Math.max(1, Math.ceil(result.total / result.page_size));
+    if (page.value > lastPage) {
+      page.value = lastPage;
+      await loadEnterpriseList();
+      return;
+    }
+    enterprises.value = result.items;
   } catch (e) {
     if (stamp === epoch) error.value = message(e);
   } finally {
@@ -826,11 +827,19 @@ async function loadRows() {
       TeamRow | EnterpriseAccount | EnterpriseEvent
     >(enterpriseID.value || undefined, section.value, {
       page: page.value,
-      page_size: 25,
+      page_size: pageSize.value,
+      search: searchQuery.value,
     });
     if (stamp === epoch) {
-      records.value = result.items;
       total.value = result.total;
+      pageSize.value = result.page_size;
+      const lastPage = Math.max(1, Math.ceil(result.total / result.page_size));
+      if (page.value > lastPage) {
+        page.value = lastPage;
+        await loadRows();
+        return;
+      }
+      records.value = result.items;
     }
   } catch (e) {
     if (stamp === epoch) error.value = message(e);
@@ -841,16 +850,36 @@ async function loadRows() {
 async function changeSection(tab: string) {
   section.value = tab;
   page.value = 1;
+  resetSearch();
   if (tab !== "overview") await loadRows();
   else {
     epoch++;
     await loadStats();
   }
 }
-async function paginate(delta: number) {
-  page.value += delta;
-  if (platform.value && !enterpriseID.value) await initialize();
+async function refreshTable() {
+  if (platform.value && !enterpriseID.value) await loadEnterpriseList();
   else await loadRows();
+}
+function resetSearch() {
+  searchInput.value = "";
+  searchQuery.value = "";
+  total.value = 0;
+}
+async function handleSearch(value: string) {
+  if (value !== searchInput.value) return;
+  searchQuery.value = value.trim();
+  page.value = 1;
+  await refreshTable();
+}
+async function changePage(value: number) {
+  page.value = value;
+  await refreshTable();
+}
+async function changePageSize(value: number) {
+  pageSize.value = value;
+  page.value = 1;
+  await refreshTable();
 }
 function selectEnterprise(id: number) {
   page.value = 1;
@@ -879,7 +908,6 @@ async function open(
   formReady.value = false;
   formLoading.value = true;
   choices.value = [];
-  search.value = "";
   detail.value = null;
   Object.assign(form, {
     name: entity?.name || "",
@@ -891,22 +919,26 @@ async function open(
     username: "",
     password: "",
   });
+  if (["createEnterprise", "leader", "appoint", "attach"].includes(kind)) {
+    await loadChoices();
+    return;
+  }
   try {
     if (kind === "teamDetail") {
       const data = await enterprisesAPI.team(dialogEntityID.value);
       if (stamp === dialogEpoch) detail.value = data;
-    } else if (
-      ["createEnterprise", "leader", "appoint", "attach"].includes(kind)
-    )
-      await loadChoices();
-    else formReady.value = true;
+    } else formReady.value = true;
   } catch (e) {
     if (stamp === dialogEpoch) formError.value = message(e);
   } finally {
     if (stamp === dialogEpoch) formLoading.value = false;
   }
 }
-async function loadChoices() {
+function searchLeaderChoices(query: string) {
+  if (!isLeaderCandidateSearch.value || saving.value) return;
+  void loadChoices(query);
+}
+async function loadChoices(query = "") {
   const stamp = ++choicesEpoch,
     currentDialog = dialogEpoch;
   formLoading.value = true;
@@ -925,7 +957,7 @@ async function loadChoices() {
             ? await teamsAPI.list(p, -1)
             : dialog.value === "appoint"
               ? await enterprisesAPI.teamCandidates(dialogEntityID.value, p)
-              : await enterprisesAPI.candidates(search.value, p);
+              : await enterprisesAPI.candidates(query, p);
         if (stamp !== choicesEpoch || currentDialog !== dialogEpoch) return;
         result.push(...data.items);
         if (result.length >= data.total || !data.items.length) break;
@@ -1029,6 +1061,7 @@ async function save() {
 watch(
   () => route.fullPath,
   () => {
+    resetSearch();
     closeDialog();
     page.value = 1;
     section.value = "overview";
@@ -1044,9 +1077,15 @@ watch(
   (_next, previous) => {
     if (!previous[0] || platform.value) return;
     closeDialog();
+    resetSearch();
     void initialize();
   },
 );
+onUnmounted(() => {
+  epoch++;
+  dialogEpoch++;
+  choicesEpoch++;
+});
 onMounted(initialize);
 </script>
 

@@ -2,6 +2,9 @@ export default {
   enterprise: {
     select: "Select an option",
     title: "Enterprise management",
+    searchPlaceholder: "Search enterprises or leaders",
+    searchAdministrators: "Search administrators, emails or teams",
+    searchEvents: "Search teams or actor emails",
     mine: "My enterprise",
     back: "Back to enterprises",
     name: "Enterprise name",

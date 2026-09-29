@@ -2,6 +2,9 @@ export default {
   enterprise: {
     select: "请选择",
     title: "企业管理",
+    searchPlaceholder: "搜索企业名称或负责人",
+    searchAdministrators: "搜索管理员姓名、邮箱或团队",
+    searchEvents: "搜索团队名称或操作者邮箱",
     mine: "我的企业",
     back: "返回企业列表",
     name: "企业名称",

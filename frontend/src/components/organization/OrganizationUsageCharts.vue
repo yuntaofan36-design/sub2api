@@ -3,12 +3,13 @@
     <div class="card min-w-0 p-5">
       <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h3 class="font-semibold">{{ t('orgDashboard.trend') }}</h3>
-        <div class="flex rounded-lg bg-gray-100 p-1 dark:bg-dark-800">
+        <div class="tabs inline-flex shrink-0">
           <button
             v-for="item in metrics"
             :key="item"
-            class="rounded-md px-3 py-1 text-xs"
-            :class="metric === item ? 'bg-white shadow-sm dark:bg-dark-700' : 'text-gray-500'"
+            type="button"
+            class="tab !px-2 !py-1 text-xs"
+            :class="metric === item ? 'tab-active' : ''"
             @click="metric = item"
           >
             {{ t(`orgDashboard.${item}`) }}
@@ -27,12 +28,12 @@
           <Doughnut :data="modelData" :options="modelOptions" />
         </div>
         <div class="max-h-64 min-w-0 flex-1 overflow-auto">
-          <table class="w-full text-sm">
+          <table class="w-full min-w-[360px] text-sm">
             <thead>
               <tr class="text-xs text-gray-500">
-                <th class="pb-3 text-left">{{ t('orgDashboard.model') }}</th>
-                <th class="pb-3 text-right">{{ t('orgDashboard.requests') }}</th>
-                <th class="pb-3 text-right">{{ t('orgDashboard.cost') }}</th>
+                <th class="min-w-[220px] pb-3 text-left">{{ t('orgDashboard.model') }}</th>
+                <th class="min-w-[120px] pb-3 text-right">{{ t('orgDashboard.requests') }}</th>
+                <th class="min-w-[120px] pb-3 text-right">{{ t('orgDashboard.cost') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -41,9 +42,9 @@
                 :key="model.model"
                 class="border-t border-gray-100 dark:border-dark-700"
               >
-                <td class="max-w-48 break-words py-2 pr-3">{{ model.model }}</td>
-                <td class="py-2 text-right">{{ model.requests.toLocaleString() }}</td>
-                <td class="py-2 pl-3 text-right">{{ money(model.cost) }}</td>
+                <td class="min-w-[220px] max-w-48 break-words py-2 pr-3">{{ model.model }}</td>
+                <td class="min-w-[120px] py-2 text-right">{{ model.requests.toLocaleString() }}</td>
+                <td class="min-w-[120px] py-2 pl-3 text-right">{{ money(model.cost) }}</td>
               </tr>
             </tbody>
           </table>

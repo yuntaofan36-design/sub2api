@@ -13,7 +13,6 @@
         >{{ t('orgDashboard.manage') }}</router-link
       >
     </div>
-    <p class="text-sm text-gray-500">{{ t('orgDashboard.scopeHint') }}</p>
     <div
       v-if="paused"
       class="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
@@ -43,12 +42,20 @@
           @update:model-value="filtersChanged"
         />
       </div>
-      <button class="btn btn-secondary sm:ml-auto" :disabled="loading" @click="refresh">
+      <button
+        type="button"
+        class="btn btn-secondary sm:ml-auto"
+        :disabled="loading"
+        @click="refresh"
+      >
         {{ t('common.refresh') }}
       </button>
     </div>
     <div v-if="error" class="rounded-xl bg-red-50 p-4 text-red-700 dark:bg-red-950" role="alert">
-      {{ error }} <button class="ml-3 underline" @click="refresh">{{ t('common.retry') }}</button>
+      {{ error }}
+      <button type="button" class="btn btn-ghost btn-sm ml-2 align-middle" @click="refresh">
+        {{ t('common.retry') }}
+      </button>
     </div>
     <div v-if="loading" class="flex justify-center py-12"><LoadingSpinner /></div>
     <template v-else-if="data">
@@ -61,15 +68,17 @@
       </div>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div v-for="card in usageCards(data.usage)" :key="card.label" class="card p-5">
-          <p class="text-sm text-gray-500">{{ card.label }}</p>
+          <div class="flex items-center text-sm text-gray-500">
+            <span>{{ card.label }}</span>
+            <HelpTooltip v-if="card.hint" :content="card.hint" />
+          </div>
           <p class="mt-3 text-2xl font-semibold">{{ card.value }}</p>
           <p class="mt-2 text-xs text-gray-400">{{ t('orgDashboard.period') }}</p>
         </div>
       </div>
       <p class="text-sm text-gray-500">
         {{ t('orgDashboard.allocated') }}:
-        <span class="font-medium">{{ money(data.resources.allocated_balance) }}</span> ·
-        {{ t('orgDashboard.costHint') }}
+        <span class="font-medium">{{ money(data.resources.allocated_balance) }}</span>
       </p>
       <OrganizationUsageCharts :trend="data.trend" :models="data.models" :kind="kind" />
       <div v-if="kind === 'enterprise'" class="card overflow-hidden">
@@ -80,6 +89,7 @@
         <DataTable :columns="teamColumns" :data="data.teams" :expandable-actions="false">
           <template #cell-name="{ row }"
             ><button
+              type="button"
               class="font-medium text-blue-600 dark:text-blue-400"
               @click="selectTeam(row.team_id)"
             >
@@ -97,7 +107,7 @@
             {{ allMembers ? t('orgDashboard.members') : t('orgDashboard.memberRanking') }}
             <span v-if="!allMembers" class="text-xs font-normal text-gray-500">Top 12</span>
           </h3>
-          <button class="btn btn-secondary btn-sm" @click="toggleMembers">
+          <button type="button" class="btn btn-secondary btn-sm" @click="toggleMembers">
             {{ allMembers ? t('orgDashboard.showRanking') : t('orgDashboard.showAll') }}
           </button>
         </div>
@@ -108,7 +118,7 @@
           :expandable-actions="false"
         >
           <template #cell-username="{ row }"
-            ><button class="text-left" @click="openMember(row)">
+            ><button type="button" class="text-left" @click="openMember(row)">
               <p class="font-medium text-primary-600">{{ row.username || row.email }}</p>
               <p v-if="row.username" class="text-xs text-gray-500">{{ row.email }}</p>
             </button></template
@@ -188,6 +198,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import OrganizationUsageCharts from './OrganizationUsageCharts.vue'
 const props = defineProps<{ kind: OrganizationKind }>()
 const emit = defineEmits<{ (event: 'permission-change'): void }>()
@@ -248,25 +259,31 @@ const resourceCards = computed(() => {
   ]
 })
 const usageCards = (usage: OrganizationMetrics) => [
-  { label: t('orgDashboard.requests'), value: count(usage.requests) },
+  { label: t('orgDashboard.requests'), value: count(usage.requests), hint: t('orgDashboard.scopeHint') },
   { label: t('orgDashboard.tokens'), value: count(usage.tokens) },
-  { label: t('orgDashboard.cost'), value: money(usage.cost) },
+  { label: t('orgDashboard.cost'), value: money(usage.cost), hint: t('orgDashboard.costHint') },
   {
     label: t('orgDashboard.duration'),
     value: `${Math.round(usage.average_duration_ms).toLocaleString()} ms`
   }
 ]
 const metricColumns = computed(() =>
-  ['requests', 'tokens', 'cost'].map((key) => ({ key, label: t(`orgDashboard.${key}`) }))
+  ['requests', 'tokens', 'cost'].map((key) => ({
+    key,
+    label: t(`orgDashboard.${key}`),
+    class: 'min-w-[140px]'
+  }))
 )
 const teamColumns = computed(() => [
-  { key: 'name', label: t('orgDashboard.team') },
+  { key: 'name', label: t('orgDashboard.team'), class: 'min-w-[220px]' },
   ...metricColumns.value
 ])
 const memberColumns = computed(() => [
-  { key: 'username', label: t('orgDashboard.member') },
-  ...(props.kind === 'enterprise' ? [{ key: 'team_name', label: t('orgDashboard.team') }] : []),
-  { key: 'status', label: t('teams.status') },
+  { key: 'username', label: t('orgDashboard.member'), class: 'min-w-[240px]' },
+  ...(props.kind === 'enterprise'
+    ? [{ key: 'team_name', label: t('orgDashboard.team'), class: 'min-w-[180px]' }]
+    : []),
+  { key: 'status', label: t('teams.status'), class: 'min-w-[120px]' },
   ...metricColumns.value
 ])
 function closeDetail() {

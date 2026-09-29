@@ -16,6 +16,13 @@ export default {
     invitation_revoke: "撤销邀请",
 
     title: "团队管理",
+    searchPlaceholder: "搜索团队、企业名称或管理员",
+    searchMembers: "搜索成员姓名或邮箱",
+    searchKeys: "搜索 Key 名称、成员邮箱或分组",
+    searchGrants: "搜索订阅分组",
+    searchInvitations: "搜索邀请邮箱",
+    searchUsage: "搜索成员邮箱或模型",
+    searchLedger: "搜索操作者或接收人邮箱",
     mine: "我的团队",
     overview: "概览",
     members: "成员",

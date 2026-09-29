@@ -16,6 +16,13 @@ export default {
     invitation_revoke: "Invitation revoked",
 
     title: "Team management",
+    searchPlaceholder: "Search teams, enterprises or administrators",
+    searchMembers: "Search member names or emails",
+    searchKeys: "Search key names, member emails or groups",
+    searchGrants: "Search subscription groups",
+    searchInvitations: "Search invitation emails",
+    searchUsage: "Search member emails or models",
+    searchLedger: "Search actor or recipient emails",
     mine: "My team",
     overview: "Overview",
     members: "Members",

@@ -317,6 +317,10 @@ const BatchImageIcon = {
     )
 }
 
+const OpsIcon = {
+  render: () => h(Icon, { name: 'server' })
+}
+
 const ChartIcon = {
   render: () =>
     h(
@@ -360,6 +364,10 @@ const UserIcon = {
         })
       ]
     )
+}
+
+const EnterpriseIcon = {
+  render: () => h(Icon, { name: 'building' })
 }
 
 const UsersIcon = {
@@ -720,7 +728,7 @@ const flagBatchImageAccess = () => canUseBatchImage.value
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
   if (!appStore.backendModeEnabled && !authStore.isSimpleMode && !isAdmin.value) {
-    items.push(authStore.isEnterpriseAdmin ? { path: '/my-enterprise', label: t('enterprise.mine'), icon: UsersIcon } : { path: '/my-team', label: t('teams.mine'), icon: UsersIcon })
+    items.push(authStore.isEnterpriseAdmin ? { path: '/my-enterprise', label: t('enterprise.mine'), icon: EnterpriseIcon } : { path: '/my-team', label: t('teams.mine'), icon: UsersIcon })
   }
   if (withDashboard) {
     items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon })
@@ -779,10 +787,10 @@ const customMenuItemsForAdmin = computed(() => {
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/enterprises', label: t('enterprise.title'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: () => !appStore.backendModeEnabled },
+    { path: '/admin/ops', label: t('nav.ops'), icon: OpsIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/enterprises', label: t('enterprise.title'), icon: EnterpriseIcon, hideInSimpleMode: true, featureFlag: () => !appStore.backendModeEnabled },
     { path: '/admin/teams', label: t('teams.title'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: () => !appStore.backendModeEnabled },
-    { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
+    { path: '/admin/users', label: t('nav.users'), icon: UserIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon },
     {
       path: '/admin/channels',

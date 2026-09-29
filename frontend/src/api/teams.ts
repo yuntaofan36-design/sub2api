@@ -90,10 +90,10 @@ export interface TeamPage {
 export const teamsAPI = {
   current: async () =>
     (await apiClient.get<TeamSummary | null>("/teams/current")).data,
-  list: async (page = 1, enterpriseID = 0) =>
+  list: async (page = 1, enterpriseID = 0, search = "", pageSize = 25) =>
     (
       await apiClient.get<TeamPage>("/admin/teams", {
-        params: { page, page_size: 25, enterprise_id: enterpriseID },
+        params: { page, page_size: pageSize, enterprise_id: enterpriseID, search },
       })
     ).data,
   overview: async (id: number, mine = false) =>

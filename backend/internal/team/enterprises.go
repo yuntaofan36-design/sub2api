@@ -73,7 +73,9 @@ func recordEnterprise(ctx context.Context, q queryer, id, actor int64, kind stri
 const enterpriseLeadersSQL = `COALESCE((SELECT json_agg(json_build_object('id',u.id,'email',u.email,'username',u.username,'status',u.status) ORDER BY u.id) FROM enterprise_leaders l JOIN users u ON u.id=l.user_id WHERE l.enterprise_id=e.id AND l.left_at IS NULL AND u.deleted_at IS NULL),'[]'::json)`
 
 func (s *Service) ListEnterprises(ctx context.Context, f Filter) (any, error) {
-	return page(ctx, s.db, `SELECT e.id,e.name,e.status,e.allow_member_usage_view,e.created_at,`+enterpriseLeadersSQL+` AS leaders,(SELECT count(*) FROM teams t WHERE t.enterprise_id=e.id) AS team_count FROM enterprises e ORDER BY e.id DESC`, nil, f)
+	args := []any{}
+	search := searchClause(f.Search, &args, "e.name", `(SELECT string_agg(concat_ws(' ',u.email,u.username),' ') FROM enterprise_leaders l JOIN users u ON u.id=l.user_id WHERE l.enterprise_id=e.id AND l.left_at IS NULL AND u.deleted_at IS NULL)`)
+	return page(ctx, s.db, `SELECT e.id,e.name,e.status,e.allow_member_usage_view,e.created_at,`+enterpriseLeadersSQL+` AS leaders,(SELECT count(*) FROM teams t WHERE t.enterprise_id=e.id) AS team_count FROM enterprises e WHERE true`+search+` ORDER BY e.id DESC`, args, f)
 }
 func (s *Service) Enterprise(ctx context.Context, actor, id int64) (any, error) {
 	entity, e := s.enterpriseScope(ctx, s.db, actor, id, false)
@@ -296,7 +298,9 @@ func (s *Service) EnterpriseAdministrators(ctx context.Context, actor, id int64,
 	if err != nil {
 		return nil, err
 	}
-	return page(ctx, s.db, `SELECT u.id,u.email,u.username,u.status,m.status AS member_status,t.id AS team_id,t.name AS team_name FROM teams t JOIN team_memberships m ON m.team_id=t.id JOIN users u ON u.id=m.user_id WHERE t.enterprise_id=$1 AND m.left_at IS NULL AND u.role='team_admin' AND u.deleted_at IS NULL ORDER BY t.id,u.id`, []any{number(e, "id")}, f)
+	args := []any{number(e, "id")}
+	search := searchClause(f.Search, &args, "u.email", "u.username", "t.name")
+	return page(ctx, s.db, `SELECT u.id,u.email,u.username,u.status,m.status AS member_status,t.id AS team_id,t.name AS team_name FROM teams t JOIN team_memberships m ON m.team_id=t.id JOIN users u ON u.id=m.user_id WHERE t.enterprise_id=$1 AND m.left_at IS NULL AND u.role='team_admin' AND u.deleted_at IS NULL`+search+` ORDER BY t.id,u.id`, args, f)
 }
 func (s *Service) AdministratorCandidates(ctx context.Context, actor, id, tid int64, f Filter) (any, error) {
 	if _, _, e := s.governedTeam(ctx, s.db, actor, id, tid, false); e != nil {
@@ -315,12 +319,14 @@ func (s *Service) EnterpriseEvents(ctx context.Context, actor, id int64, f Filte
 			return nil, err
 		}
 	}
+	args := []any{id, f.TeamID}
+	search := searchClause(f.Search, &args, "x.team_name", "x.kind", "u.email")
 	return page(ctx, s.db, `SELECT x.*,'success' AS outcome,u.email AS actor_email FROM (
  SELECT 'enterprise:'||e.id AS id,NULL::bigint AS team_id,NULL::text AS team_name,e.actor_id,e.kind,e.details,e.created_at FROM enterprise_events e WHERE e.enterprise_id=$1 AND $2::bigint=0
  UNION ALL SELECT 'team:'||e.id,t.id,t.name,e.actor_id,e.kind,
  CASE WHEN e.kind IN ('funding','subscription.authorize') THEN jsonb_build_object('amount',e.amount,'details',e.details) ELSE e.details END,e.created_at
  FROM team_events e JOIN teams t ON t.id=e.team_id WHERE t.enterprise_id=$1 AND ($2::bigint=0 OR t.id=$2) AND e.kind IN ('team.save','administrator.change','administrator.create','funding','subscription.authorize')
- ) x JOIN users u ON u.id=x.actor_id ORDER BY x.created_at DESC,x.id DESC`, []any{id, f.TeamID}, f)
+ ) x JOIN users u ON u.id=x.actor_id WHERE true`+search+` ORDER BY x.created_at DESC,x.id DESC`, args, f)
 }
 func (s *Service) newTeamAdministrator(ctx context.Context, q queryer, tid, actor int64, in MemberInput) (int64, error) {
 	address, e := email(in.Email)

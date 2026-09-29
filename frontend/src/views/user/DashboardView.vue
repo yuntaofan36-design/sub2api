@@ -2,23 +2,14 @@
   <AppLayout>
     <div class="space-y-6">
       <div v-if="organizationKind" class="flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('nav.dashboard') }}</h1>
-        <div
-          class="inline-flex rounded-xl bg-gray-100 p-1 dark:bg-dark-800"
-          role="tablist"
-          :aria-label="t('orgDashboard.scope')"
-        >
+        <div class="tabs inline-flex" role="tablist" :aria-label="t('orgDashboard.scope')">
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            class="tab"
             role="tab"
             :aria-selected="scope === tab.value"
-            :class="
-              scope === tab.value
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
-                : 'text-gray-500'
-            "
+            :class="scope === tab.value ? 'tab-active' : ''"
             @click="setScope(tab.value)"
           >
             {{ tab.label }}

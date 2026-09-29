@@ -238,13 +238,15 @@ func (s *Service) Current(ctx context.Context, userID int64) (any, error) {
 	return r[0], nil
 }
 func (s *Service) ListTeams(ctx context.Context, f Filter) (any, error) {
+	args := []any{f.EnterpriseID}
+	search := searchClause(f.Search, &args, "t.name", "e.name", `(SELECT string_agg(concat_ws(' ',u.email,u.username),' ') FROM team_memberships m JOIN users u ON u.id=m.user_id WHERE m.team_id=t.id AND m.left_at IS NULL AND u.role='team_admin' AND u.deleted_at IS NULL)`)
 	return page(ctx, s.db, `SELECT t.id,t.name,t.status,t.balance,t.created_at,t.updated_at,t.enterprise_id,e.name AS enterprise_name,e.status AS enterprise_status,
  (SELECT count(*) FROM team_memberships m WHERE m.team_id=t.id AND m.left_at IS NULL) AS member_count,
  COALESCE((SELECT json_agg(json_build_object('id',u.id,'email',u.email,'username',u.username,
  'status',u.status,'member_status',m.status) ORDER BY u.id)
  FROM team_memberships m JOIN users u ON u.id=m.user_id
  WHERE m.team_id=t.id AND m.left_at IS NULL AND u.role='team_admin' AND u.deleted_at IS NULL), '[]'::json) AS administrators
- FROM teams t LEFT JOIN enterprises e ON e.id=t.enterprise_id WHERE ($1::bigint=0 OR t.enterprise_id=$1 OR ($1=-1 AND t.enterprise_id IS NULL)) ORDER BY t.id DESC`, []any{f.EnterpriseID}, f)
+ FROM teams t LEFT JOIN enterprises e ON e.id=t.enterprise_id WHERE ($1::bigint=0 OR t.enterprise_id=$1 OR ($1=-1 AND t.enterprise_id IS NULL))`+search+` ORDER BY t.id DESC`, args, f)
 }
 
 type TeamInput struct {

@@ -287,6 +287,7 @@ func filter(c *gin.Context) (Filter, error) {
 	f.MemberID, _ = strconv.ParseInt(c.Query("member_id"), 10, 64)
 	f.KeyID, _ = strconv.ParseInt(c.Query("key_id"), 10, 64)
 	f.Model = c.Query("model")
+	f.Search = strings.TrimSpace(c.Query("search"))
 	for k, p := range map[string]*time.Time{"from": &f.From, "to": &f.To} {
 		if v := c.Query(k); v != "" {
 			t, e := time.Parse(time.RFC3339, v)
