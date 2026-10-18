@@ -6,6 +6,7 @@
 import { apiClient } from '../client'
 import type {
   DashboardStats,
+  TopUserPaymentStats,
   PaymentOrder,
   PaymentChannel,
   SubscriptionPlan,
@@ -80,6 +81,13 @@ export const adminPaymentAPI = {
   getDashboard(days?: number) {
     return apiClient.get<DashboardStats>('/admin/payment/dashboard', {
       params: days ? { days } : undefined
+    })
+  },
+
+  getDashboardTopUsers(params: { days: number; currency: string; page: number; page_size: number }, signal?: AbortSignal) {
+    return apiClient.get<BasePaginationResponse<TopUserPaymentStats>>('/admin/payment/dashboard/top-users', {
+      params,
+      signal
     })
   },
 

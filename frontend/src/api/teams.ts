@@ -1,4 +1,6 @@
 import { apiClient } from "./client";
+import type { OrganizationMetrics, OrganizationPoint, OrganizationModel } from './organizationDashboard';
+import type { GroupPlatform } from '@/types';
 
 export interface TeamSummary {
   enterprise_id?: number | null;
@@ -17,6 +19,7 @@ export interface TeamGroup {
   status: string;
 }
 export interface TeamOverview extends TeamSummary {
+  administrators?: Pick<TeamAdministrator, 'id' | 'email' | 'username'>[];
   can_manage: boolean;
   can_view_team?: boolean;
   platform_admin: boolean;
@@ -53,6 +56,10 @@ export interface TeamRow {
   allocated_balance?: number;
   group_id?: number;
   group_name?: string;
+  platform?: GroupPlatform | null;
+  allow_messages_dispatch?: boolean;
+  subscription_type?: string;
+  can_use_group?: boolean;
   quantity?: number;
   remaining?: number;
   validity_days?: number;
@@ -65,6 +72,12 @@ export interface TeamRow {
   rate_limit_5h?: number;
   rate_limit_1d?: number;
   rate_limit_7d?: number;
+  usage_5h?: number;
+  usage_1d?: number;
+  usage_7d?: number;
+  reset_5h_at?: string | null;
+  reset_1d_at?: string | null;
+  reset_7d_at?: string | null;
   kind?: string;
   outcome?: string;
   amount?: number;
@@ -87,6 +100,11 @@ export interface TeamPage {
   page: number;
   page_size: number;
 }
+export interface TeamMemberUsage {
+  usage: OrganizationMetrics;
+  trend: OrganizationPoint[];
+  models: OrganizationModel[];
+}
 export const teamsAPI = {
   current: async () =>
     (await apiClient.get<TeamSummary | null>("/teams/current")).data,
@@ -103,7 +121,10 @@ export const teamsAPI = {
     id: number,
     kind: string,
     params: Record<string, unknown> = {},
-  ) => (await apiClient.get<TeamPage>(`/teams/${id}/${kind}`, { params })).data,
+    signal?: AbortSignal,
+  ) => (await apiClient.get<TeamPage>(`/teams/${id}/${kind}`, { params, signal })).data,
+  memberDashboard: async (id: number, params: Record<string, unknown>, signal?: AbortSignal) =>
+    (await apiClient.get<TeamMemberUsage>(`/teams/${id}/my-usage-dashboard`, { params, signal })).data,
   save: async (
     method: "post" | "put" | "patch" | "delete",
     path: string,

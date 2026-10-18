@@ -76,6 +76,7 @@ func RegisterPaymentRoutes(
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
+		adminGroup.GET("/dashboard/top-users", adminPaymentHandler.GetDashboardTopUsers)
 
 		// Config
 		adminGroup.GET("/config", adminPaymentHandler.GetConfig)

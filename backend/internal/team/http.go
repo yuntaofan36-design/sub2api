@@ -109,6 +109,15 @@ func Register(v1 *gin.RouterGroup, s *Service, jwt middleware.JWTAuthMiddleware,
 		out, e := s.Overview(c.Request.Context(), actor(c), param(c, "teamID"), c.Query("mine") == "true")
 		respond(c, out, e)
 	})
+	teams.GET("/:teamID/my-usage-dashboard", func(c *gin.Context) {
+		f, e := memberDashboardFilter(c)
+		if e != nil {
+			respond(c, nil, e)
+			return
+		}
+		out, e := s.MemberDashboard(c.Request.Context(), actor(c), param(c, "teamID"), f)
+		respond(c, out, e)
+	})
 	for _, kind := range []string{"members", "keys", "grants", "invitations", "ledger", "usage"} {
 		teams.GET("/:teamID/"+kind, func(c *gin.Context) {
 			f, e := filter(c)

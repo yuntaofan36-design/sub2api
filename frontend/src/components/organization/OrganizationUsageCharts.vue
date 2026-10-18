@@ -42,7 +42,10 @@
                 :key="model.model"
                 class="border-t border-gray-100 dark:border-dark-700"
               >
-                <td class="min-w-[220px] max-w-48 break-words py-2 pr-3">{{ model.model }}</td>
+                <td class="min-w-[220px] max-w-48 break-words py-2 pr-3">
+                  <button v-if="interactiveModels" type="button" class="text-left text-primary-600 hover:underline dark:text-primary-400" @click="$emit('selectModel', model.model)">{{ model.model }}</button>
+                  <template v-else>{{ model.model }}</template>
+                </td>
                 <td class="min-w-[120px] py-2 text-right">{{ model.requests.toLocaleString() }}</td>
                 <td class="min-w-[120px] py-2 pl-3 text-right">{{ money(model.cost) }}</td>
               </tr>
@@ -87,7 +90,9 @@ const props = defineProps<{
   trend: OrganizationPoint[]
   models: OrganizationModel[]
   kind: 'enterprise' | 'team'
+  interactiveModels?: boolean
 }>()
+defineEmits<{ selectModel: [model: string] }>()
 const { t } = useI18n()
 const metrics = ['requests', 'tokens', 'cost'] as const
 const metric = ref<(typeof metrics)[number]>('tokens')

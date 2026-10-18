@@ -12,6 +12,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
 
 // --- Dashboard & Analytics ---
@@ -51,6 +52,32 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 	st.TopUsers = buildTopUsers(orders)
 
 	return st, nil
+}
+
+func (s *PaymentService) GetDashboardTopUsers(ctx context.Context, days int, currency string, params pagination.PaginationParams) ([]TopUserStat, int, error) {
+	if days <= 0 {
+		days = 30
+	}
+	orders, err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.StatusIn(OrderStatusCompleted, OrderStatusPaid, OrderStatusRecharging),
+			paymentorder.PaidAtGTE(time.Now().AddDate(0, 0, -days)),
+		).
+		Select(paymentorder.FieldUserID, paymentorder.FieldUserEmail, paymentorder.FieldPayAmount, paymentorder.FieldProviderSnapshot).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	users := rankPaymentUsers(orders)[currency]
+	total := len(users)
+	page := max(1, params.Page)
+	pageSize := params.Limit()
+	// Check the page before multiplying so large page numbers cannot overflow.
+	if total == 0 || page > (total-1)/pageSize+1 {
+		return []TopUserStat{}, total, nil
+	}
+	start := (page - 1) * pageSize
+	return users[start:min(start+pageSize, total)], total, nil
 }
 
 func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todayStart time.Time) {
@@ -128,6 +155,16 @@ func buildMethodDistribution(orders []*dbent.PaymentOrder) []PaymentMethodStat {
 }
 
 func buildTopUsers(orders []*dbent.PaymentOrder) TopUsersByCurrency {
+	result := rankPaymentUsers(orders)
+	for currency, users := range result {
+		if len(users) > topUsersLimit {
+			result[currency] = users[:topUsersLimit]
+		}
+	}
+	return result
+}
+
+func rankPaymentUsers(orders []*dbent.PaymentOrder) TopUsersByCurrency {
 	userMap := make(map[string]map[int64]*TopUserStat)
 	for _, o := range orders {
 		currency := PaymentOrderCurrency(o)
@@ -151,15 +188,14 @@ func buildTopUsers(orders []*dbent.PaymentOrder) TopUsersByCurrency {
 			userList = append(userList, us)
 		}
 		sort.Slice(userList, func(i, j int) bool {
+			if userList[i].Amount == userList[j].Amount {
+				return userList[i].UserID < userList[j].UserID
+			}
 			return userList[i].Amount > userList[j].Amount
 		})
-		limit := topUsersLimit
-		if len(userList) < limit {
-			limit = len(userList)
-		}
-		result[currency] = make([]TopUserStat, 0, limit)
-		for i := 0; i < limit; i++ {
-			result[currency] = append(result[currency], *userList[i])
+		result[currency] = make([]TopUserStat, 0, len(userList))
+		for _, user := range userList {
+			result[currency] = append(result[currency], *user)
 		}
 	}
 	return result

@@ -5,6 +5,8 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -42,6 +44,27 @@ func (h *PaymentHandler) GetDashboard(c *gin.Context) {
 		return
 	}
 	response.Success(c, stats)
+}
+
+// GetDashboardTopUsers returns a paginated payment ranking for one currency.
+// GET /api/v1/admin/payment/dashboard/top-users
+func (h *PaymentHandler) GetDashboardTopUsers(c *gin.Context) {
+	days := 30
+	if v, err := strconv.Atoi(c.Query("days")); err == nil && v > 0 {
+		days = v
+	}
+	currency, err := payment.NormalizePaymentCurrency(c.Query("currency"))
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	page, pageSize := response.ParsePagination(c)
+	users, total, err := h.paymentService.GetDashboardTopUsers(c.Request.Context(), days, currency, pagination.PaginationParams{Page: page, PageSize: pageSize})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, users, int64(total), page, pageSize)
 }
 
 // --- Orders ---

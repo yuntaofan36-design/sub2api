@@ -49,7 +49,7 @@
         </div>
         <div class="ml-auto flex flex-wrap gap-2">
           <router-link
-            v-if="auth.isTeamAdmin"
+            v-if="!platform"
             to="/dashboard?scope=personal"
             class="btn btn-secondary"
             >{{ t("teams.personal") }}</router-link
@@ -246,7 +246,7 @@
         >
           {{ t("teams.inactiveHint") }}
         </div>
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div v-if="canViewTeam" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div class="card p-5">
             <p class="text-sm text-gray-500">{{ t("teams.requests") }}</p>
             <p class="mt-2 text-2xl font-semibold">
@@ -311,6 +311,13 @@
             {{ t(`teams.${tab}`) }}
           </button>
         </div>
+        <TeamMemberWorkspace
+          v-if="!canViewTeam && section === 'overview'"
+          :key="`${teamID}:${auth.user?.id}:${auth.user?.role}`"
+          :team="overview"
+          :available-keys="keys"
+          @records="openMemberUsage"
+        />
         <div class="flex flex-wrap justify-between gap-3">
           <div v-if="section !== 'overview'" class="w-full md:w-80">
             <SearchInput
@@ -964,6 +971,7 @@ import SearchInput from "@/components/common/SearchInput.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import HelpTooltip from "@/components/common/HelpTooltip.vue";
+import TeamMemberWorkspace from "@/components/team/TeamMemberWorkspace.vue";
 import Icon from "@/components/icons/Icon.vue";
 import TotpStepUpDialog from "@/components/auth/TotpStepUpDialog.vue";
 import { useStepUp, isStepUpCancelled } from "@/composables/useStepUp";
@@ -1106,7 +1114,7 @@ const tabs = computed(() =>
         "ledger",
         "invitations",
       ]
-    : ["keys", "usage", "ledger"],
+    : ["overview", "usage", "ledger"],
 );
 const statusOptions = computed(() =>
   ["active", "disabled"].map((value) => ({
@@ -1506,6 +1514,10 @@ async function changeSection(tab: string) {
   page.value = 1;
   resetSearch();
   await loadRows();
+}
+function openMemberUsage(value: { keyID: number; model: string; startDate: string; endDate: string }) {
+  Object.assign(filters, { key_id: value.keyID, model: value.model, from: value.startDate, to: value.endDate });
+  void changeSection('usage');
 }
 function resetSearch() {
   searchInput.value = "";
@@ -1924,7 +1936,13 @@ watch(
   },
 );
 watch(
-  [() => auth.user?.role, () => auth.user?.team?.enterprise_status],
+  [
+    () => auth.user?.role,
+    () => auth.user?.team?.id,
+    () => auth.user?.team?.status,
+    () => auth.user?.team?.member_status,
+    () => auth.user?.team?.enterprise_status,
+  ],
   (_next, previous) => {
     if (!previous[0] || route.name !== "MyTeam") return;
     resetSearch();
